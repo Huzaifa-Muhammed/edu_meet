@@ -249,6 +249,9 @@ export function StudentMainArea({
 
       {pane === "live" && (
       <div className="pane on">
+        {/* Always-on audio mixer for every non-local participant */}
+        <RoomAudioMixer />
+
         {/* Reward confetti */}
         <RewardBroadcast payload={broadcast} onDone={() => setBroadcast(null)} />
 
@@ -412,35 +415,92 @@ function TeacherTile({
   participantId: string;
   teacherName: string;
 }) {
-  const { webcamStream, webcamOn, displayName } = useParticipant(participantId);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const p = useParticipant(participantId) as unknown as {
+    webcamStream?: { track: MediaStreamTrack };
+    webcamOn: boolean;
+    screenShareStream?: { track: MediaStreamTrack };
+    screenShareAudioStream?: { track: MediaStreamTrack };
+    screenShareOn: boolean;
+    displayName?: string;
+    isLocal: boolean;
+  };
+  const {
+    webcamStream,
+    webcamOn,
+    screenShareStream,
+    screenShareAudioStream,
+    screenShareOn,
+    displayName,
+    isLocal,
+  } = p;
+
+  const webcamRef = useRef<HTMLVideoElement | null>(null);
+  const screenRef = useRef<HTMLVideoElement | null>(null);
+  const screenAudioRef = useRef<HTMLAudioElement | null>(null);
+
   const initials = (displayName ?? teacherName ?? "T")
     .split(" ")
-    .map((p) => p[0])
+    .map((part) => part[0])
     .filter(Boolean)
     .slice(0, 2)
     .join("")
     .toUpperCase();
 
+  // Webcam video
   useEffect(() => {
-    if (!videoRef.current) return;
-    if (webcamOn && webcamStream) {
+    if (!webcamRef.current) return;
+    if (webcamOn && webcamStream && !screenShareOn) {
       const media = new MediaStream();
       media.addTrack(webcamStream.track);
-      videoRef.current.srcObject = media;
-      videoRef.current.play().catch(() => {});
+      webcamRef.current.srcObject = media;
+      webcamRef.current.play().catch(() => {});
     } else {
-      videoRef.current.srcObject = null;
+      webcamRef.current.srcObject = null;
     }
-  }, [webcamOn, webcamStream]);
+  }, [webcamOn, webcamStream, screenShareOn]);
+
+  // Screen share video — takes over the stage when active
+  useEffect(() => {
+    if (!screenRef.current) return;
+    if (screenShareOn && screenShareStream) {
+      const media = new MediaStream();
+      media.addTrack(screenShareStream.track);
+      screenRef.current.srcObject = media;
+      screenRef.current.play().catch(() => {});
+    } else {
+      screenRef.current.srcObject = null;
+    }
+  }, [screenShareOn, screenShareStream]);
+
+  // Screen share system audio (e.g., teacher plays a video while sharing)
+  useEffect(() => {
+    if (!screenAudioRef.current) return;
+    if (screenShareOn && screenShareAudioStream && !isLocal) {
+      const ms = new MediaStream();
+      ms.addTrack(screenShareAudioStream.track);
+      screenAudioRef.current.srcObject = ms;
+      screenAudioRef.current.play().catch(() => {});
+    } else {
+      screenAudioRef.current.srcObject = null;
+    }
+  }, [screenShareOn, screenShareAudioStream, isLocal]);
 
   return (
     <div className="absolute inset-0">
-      {webcamOn ? (
+      {screenShareOn ? (
         <video
-          ref={videoRef}
+          ref={screenRef}
           autoPlay
           playsInline
+          muted
+          className="h-full w-full bg-black object-contain"
+        />
+      ) : webcamOn ? (
+        <video
+          ref={webcamRef}
+          autoPlay
+          playsInline
+          muted
           className="h-full w-full object-cover"
         />
       ) : (
@@ -451,8 +511,44 @@ function TeacherTile({
           </div>
         </div>
       )}
+      {!isLocal && <audio ref={screenAudioRef} autoPlay playsInline />}
     </div>
   );
+}
+
+/** Plays mic audio for every non-local participant the student shares the
+ *  room with. Mounted once per student so e.g. peer chat / TA mics are
+ *  audible. Renders nothing visible. */
+function RoomAudioMixer() {
+  const { participants } = useMeeting();
+  const ids = [...participants.keys()];
+  return (
+    <>
+      {ids.map((pid) => (
+        <PeerAudio key={pid} participantId={pid} />
+      ))}
+    </>
+  );
+}
+
+function PeerAudio({ participantId }: { participantId: string }) {
+  const { micStream, micOn, isLocal } = useParticipant(participantId);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (!audioRef.current) return;
+    if (micOn && micStream && !isLocal) {
+      const ms = new MediaStream();
+      ms.addTrack(micStream.track);
+      audioRef.current.srcObject = ms;
+      audioRef.current.play().catch(() => {});
+    } else {
+      audioRef.current.srcObject = null;
+    }
+  }, [micOn, micStream, isLocal]);
+
+  if (isLocal) return null;
+  return <audio ref={audioRef} autoPlay playsInline />;
 }
 
 function QuizTimerBar({ question, ended }: { question: QuizQ | null; ended: boolean }) {
