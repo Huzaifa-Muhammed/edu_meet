@@ -35,7 +35,7 @@ export function StudentClassroomTopbar({
   theme?: ClassroomTheme;
   onChangeTheme?: (t: ClassroomTheme) => void;
 }) {
-  const { toggleMic, localMicOn } = useMeeting();
+  const { toggleMic, localMicOn, toggleWebcam, localWebcamOn } = useMeeting();
   const [elapsed, setElapsed] = useState("0s");
   const [themeOpen, setThemeOpen] = useState(false);
   const themeRef = useRef<HTMLDivElement | null>(null);
@@ -121,6 +121,28 @@ export function StudentClassroomTopbar({
               <>
                 <path d="M1 1l14 14M8 1a2.5 2.5 0 0 1 2.5 2.5v1.5M5.5 5.5v2A2.5 2.5 0 0 0 10 9" />
                 <path d="M3 7a5 5 0 0 0 9.5 2" />
+              </>
+            )}
+          </svg>
+        </div>
+
+        <div
+          className={`mic-btn${localWebcamOn ? "" : " muted"}`}
+          onClick={() => toggleWebcam?.()}
+          title={localWebcamOn ? "Turn camera off" : "Turn camera on"}
+          style={{ marginLeft: 4 }}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
+            {localWebcamOn ? (
+              <>
+                <rect x="1" y="4" width="9" height="8" rx="1.5" />
+                <path d="M10 7l4-2v6l-4-2z" />
+              </>
+            ) : (
+              <>
+                <path d="M1 1l14 14" />
+                <rect x="1" y="4" width="9" height="8" rx="1.5" />
+                <path d="M10 7l4-2v6l-4-2z" />
               </>
             )}
           </svg>

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMeeting, usePubSub } from "@videosdk.live/react-sdk";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import api from "@/lib/api/client";
 import { useAuth } from "@/providers/auth-provider";
 
@@ -188,7 +189,7 @@ export function StudentRightPanel({
         <ProgressTab meetingId={meetingId} />
       </div>
       <div className={`rp-pane${tab === "chat" ? " on" : ""}`}>
-        <ChatTab classroomId={classroomId} />
+        <ChatTab classroomId={classroomId} meetingId={meetingId} />
       </div>
       <div className={`rp-pane${tab === "wallet" ? " on" : ""}`}>
         <WalletTab />
@@ -659,10 +660,17 @@ function ProgressTab({ meetingId }: { meetingId: string }) {
 
 /* ─────────── Chat ─────────── */
 
-function ChatTab({ classroomId }: { classroomId: string }) {
+function ChatTab({
+  classroomId,
+  meetingId,
+}: {
+  classroomId: string;
+  meetingId: string;
+}) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [text, setText] = useState("");
+  const [askMode, setAskMode] = useState(false);
 
   const history = useQuery<ChatMsg[]>({
     queryKey: ["class-chat", classroomId],
@@ -672,6 +680,7 @@ function ChatTab({ classroomId }: { classroomId: string }) {
   });
 
   const { publish, messages: pubMsgs } = usePubSub("CHAT");
+  const { publish: publishNewQuestion } = usePubSub("NEW_QUESTION");
   const [live, setLive] = useState<ChatMsg[]>([]);
 
   useEffect(() => {
@@ -738,13 +747,60 @@ function ChatTab({ classroomId }: { classroomId: string }) {
     }
   }
 
-  const askTeacher = () => {
-    if (!text.trim()) {
-      setText("I have a question, Ms./Mr. …");
+  /** Files the current draft as a question — posts to the questions
+   *  collection (so it shows up in the teacher's Questions tab + AI
+   *  Highlights), publishes NEW_QUESTION for instant teacher refetch,
+   *  and also drops the message into chat so peers see what was asked. */
+  async function askTeacher() {
+    const t = text.trim();
+    if (!t) {
+      setAskMode(true);
+      toast.info("Type your question, then click Ask teacher");
       return;
     }
-    send();
-  };
+    setText("");
+    setAskMode(false);
+
+    const clientId = crypto.randomUUID();
+    const chatMsg: ChatMsg = {
+      id: clientId,
+      clientId,
+      senderUid: user?.uid,
+      senderName: user?.displayName ?? "Student",
+      senderRole: "student",
+      text: `❓ ${t}`,
+      createdAt: new Date().toISOString(),
+    };
+    publish(JSON.stringify(chatMsg), { persist: true });
+
+    try {
+      // 1) durable question for the teacher's Questions tab
+      await api.post(`/classrooms/${classroomId}/questions`, {
+        text: t,
+        meetingId,
+      });
+      // 2) chat mirror so peers see the message in conversation flow
+      api
+        .post(`/classrooms/${classroomId}/chat`, {
+          text: `❓ ${t}`,
+          clientId,
+          meetingId,
+        })
+        .catch(() => undefined);
+      // 3) realtime nudge — teacher's AI Highlights + Questions tab refetch
+      publishNewQuestion(
+        JSON.stringify({ uid: user?.uid, name: user?.displayName, at: Date.now() }),
+        { persist: false },
+      );
+      qc.invalidateQueries({ queryKey: ["class-chat", classroomId] });
+      toast.success("Question sent to teacher");
+    } catch (err) {
+      console.error("[ask teacher]", err);
+      toast.error(
+        err instanceof Error ? err.message : "Could not send question",
+      );
+    }
+  }
 
   const initials = (m: ChatMsg) => {
     const n = m.senderName ?? "?";
@@ -797,7 +853,11 @@ function ChatTab({ classroomId }: { classroomId: string }) {
         )}
       </div>
       <div className="ask-teacher">
-        <span style={{ flex: 1 }}>Got a question for the teacher?</span>
+        <span style={{ flex: 1 }}>
+          {askMode
+            ? "Type your question and click Ask teacher"
+            : "Got a question for the teacher?"}
+        </span>
         <button className="ask-teacher-btn" onClick={askTeacher}>
           ✋ Ask teacher
         </button>
@@ -807,8 +867,20 @@ function ChatTab({ classroomId }: { classroomId: string }) {
           className="chat-inp"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), send())}
-          placeholder="Message the class…"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              if (askMode) askTeacher();
+              else send();
+            }
+            if (e.key === "Escape" && askMode) setAskMode(false);
+          }}
+          placeholder={askMode ? "Type your question for the teacher…" : "Message the class…"}
+          style={
+            askMode
+              ? { borderColor: "#FACC15", boxShadow: "0 0 0 3px rgba(250,204,21,.18)" }
+              : undefined
+          }
         />
         <button
           className="chat-send"
