@@ -44,9 +44,15 @@ export default function SupportPage() {
   const [priority, setPriority] = useState<Priority>("normal");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
+  type Payload = {
+    problemType: ProblemType;
+    subject: string;
+    details: string;
+    priority: Priority;
+  };
+
   const submit = useMutation({
-    mutationFn: () =>
-      api.post("/student/support", { problemType, subject, details, priority }),
+    mutationFn: (data: Payload) => api.post("/student/support", data),
     onSuccess: () => {
       toast.success("Support ticket submitted. We'll be in touch.");
       setSubject("");
@@ -54,7 +60,10 @@ export default function SupportPage() {
       setPriority("normal");
       setProblemType("technical");
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => {
+      console.error("[support submit]", err);
+      toast.error(err.message || "Could not submit. Please try again.");
+    },
   });
 
   return (
@@ -71,11 +80,22 @@ export default function SupportPage() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (subject.trim().length < 2 || details.trim().length < 5) {
-              toast.error("Please fill out subject and details.");
+            const cleanSubject = subject.trim();
+            const cleanDetails = details.trim();
+            if (cleanSubject.length < 2) {
+              toast.error("Subject must be at least 2 characters.");
               return;
             }
-            submit.mutate();
+            if (cleanDetails.length < 5) {
+              toast.error("Please add at least 5 characters of detail.");
+              return;
+            }
+            submit.mutate({
+              problemType,
+              subject: cleanSubject,
+              details: cleanDetails,
+              priority,
+            });
           }}
           className="flex flex-col gap-3.5 rounded-[16px] p-[18px]"
           style={{

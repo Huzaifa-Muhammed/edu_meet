@@ -16,6 +16,7 @@ type ChatMsg = {
   senderUid?: string;
   text: string;
   createdAt: string;
+  clientId?: string;
 };
 
 type QuizQ = {
@@ -685,13 +686,26 @@ function ChatTab({ classroomId }: { classroomId: string }) {
   }, [pubMsgs.length]);
 
   const merged = useMemo(() => {
-    const seen = new Set<string>();
+    // Firestore (history) is authoritative; we only show live pubsub
+    // messages whose clientId hasn't shown up in Firestore yet. Falls
+    // back to (senderUid + text + createdAt-second) if older messages
+    // lack a clientId.
+    const seenClient = new Set<string>();
+    const seenFingerprint = new Set<string>();
+    const fp = (m: ChatMsg) =>
+      `${m.senderUid ?? ""}|${m.text}|${m.createdAt.slice(0, 19)}`;
+
     const list: ChatMsg[] = [];
     for (const m of history.data ?? []) {
-      seen.add(m.id);
+      if (m.clientId) seenClient.add(m.clientId);
+      seenFingerprint.add(fp(m));
       list.push(m);
     }
-    for (const m of live) if (!seen.has(m.id)) list.push(m);
+    for (const m of live) {
+      if (m.clientId && seenClient.has(m.clientId)) continue;
+      if (seenFingerprint.has(fp(m))) continue;
+      list.push(m);
+    }
     list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     return list;
   }, [history.data, live]);
@@ -705,8 +719,10 @@ function ChatTab({ classroomId }: { classroomId: string }) {
     const t = text.trim();
     if (!t) return;
     setText("");
+    const clientId = crypto.randomUUID();
     const msg: ChatMsg = {
-      id: crypto.randomUUID(),
+      id: clientId,
+      clientId,
       senderUid: user?.uid,
       senderName: user?.displayName ?? "Student",
       senderRole: "student",
@@ -715,7 +731,7 @@ function ChatTab({ classroomId }: { classroomId: string }) {
     };
     publish(JSON.stringify(msg), { persist: true });
     try {
-      await api.post(`/classrooms/${classroomId}/chat`, { text: t });
+      await api.post(`/classrooms/${classroomId}/chat`, { text: t, clientId });
       qc.invalidateQueries({ queryKey: ["class-chat", classroomId] });
     } catch {
       // pubsub still delivered the message

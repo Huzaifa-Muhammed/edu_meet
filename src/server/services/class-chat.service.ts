@@ -10,6 +10,10 @@ export type ChatMessage = {
   senderId: string;
   senderName: string;
   senderRole: "teacher" | "student" | "admin";
+  /** Client-supplied dedup key — matches the id used in the pubsub broadcast
+   *  so the sender can drop their own optimistic message when the server-
+   *  persisted copy comes back. */
+  clientId?: string;
   createdAt: string;
 };
 
@@ -36,6 +40,7 @@ export const classChatService = {
     classroomId: string;
     meetingId?: string | null;
     text: string;
+    clientId?: string;
     senderId: string;
     senderName: string;
     senderRole: "teacher" | "student" | "admin";
@@ -44,11 +49,14 @@ export const classChatService = {
       classroomId: args.classroomId,
       meetingId: args.meetingId ?? null,
       text: args.text.trim(),
+      clientId: args.clientId,
       senderId: args.senderId,
       senderName: args.senderName,
       senderRole: args.senderRole,
       createdAt: new Date().toISOString(),
     };
+    // Firestore rejects undefined values, so omit clientId if not provided.
+    if (!data.clientId) delete (data as Partial<ChatMessage>).clientId;
     const ref = await adminDb.collection(Collections.CHATS).add(data);
     return { id: ref.id, ...data };
   },

@@ -40,7 +40,7 @@ export function CreateAssessmentForm({
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
 
-  const { register, control, handleSubmit, reset, getValues, setValue, watch } = useForm<FormValues>({
+  const { register, control, handleSubmit, reset, getValues, watch } = useForm<FormValues>({
     defaultValues: {
       title: "",
       instructions: "",
@@ -50,7 +50,7 @@ export function CreateAssessmentForm({
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "questions",
   });
@@ -114,17 +114,32 @@ Return ONLY valid JSON in this exact shape (no prose, no fences):
       const match = txt.match(/\{[\s\S]*\}/);
       if (!match) throw new Error("Could not parse AI response");
       const parsed = JSON.parse(match[0]) as {
-        questions: { text: string; options: string[]; correctIndex: number; points?: number }[];
+        questions: {
+          text: string;
+          options: string[];
+          correctIndex: number | string;
+          points?: number;
+        }[];
       };
       const current = getValues("questions");
-      const generated: QuestionForm[] = parsed.questions.map((q) => ({
-        type: "mcq",
-        text: q.text,
-        options: [...q.options, "", "", "", ""].slice(0, 4),
-        correctIndex: q.correctIndex,
-        points: q.points ?? 1,
-      }));
-      setValue("questions", [...current.filter((c) => c.text), ...generated]);
+      const generated: QuestionForm[] = parsed.questions.map((q) => {
+        const opts = [...q.options, "", "", "", ""].slice(0, 4);
+        // Groq sometimes returns correctIndex as a string ("2") or out
+        // of bounds — clamp to [0, opts.length - 1].
+        const idx = Number(q.correctIndex);
+        const safe = Number.isFinite(idx) ? Math.min(Math.max(0, idx), 3) : 0;
+        return {
+          type: "mcq",
+          text: q.text,
+          options: opts,
+          correctIndex: safe,
+          points: q.points ?? 1,
+        };
+      });
+      // replace() (not setValue) is required so useFieldArray re-mounts
+      // the rows; setValue alone keeps the old radio inputs registered
+      // with their original correctIndex=0 state.
+      replace([...current.filter((c) => c.text), ...generated]);
       toast.success(`Added ${generated.length} questions`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "AI generation failed");
@@ -275,21 +290,27 @@ Return ONLY valid JSON in this exact shape (no prose, no fences):
               />
 
               {type === "mcq" &&
-                [0, 1, 2, 3].map((i) => (
-                  <label key={i} className="flex items-center gap-2 text-xs">
-                    <input
-                      type="radio"
-                      value={i}
-                      {...register(`questions.${idx}.correctIndex`, { valueAsNumber: true })}
-                      defaultChecked={i === 0}
-                    />
-                    <input
-                      {...register(`questions.${idx}.options.${i}`)}
-                      placeholder={`Option ${String.fromCharCode(65 + i)}`}
-                      className="flex-1 rounded-md border border-bd bg-surf px-2 py-1 text-xs text-t"
-                    />
-                  </label>
-                ))}
+                [0, 1, 2, 3].map((i) => {
+                  const currentCorrect =
+                    watch(`questions.${idx}.correctIndex`) ?? 0;
+                  return (
+                    <label key={i} className="flex items-center gap-2 text-xs">
+                      <input
+                        type="radio"
+                        value={i}
+                        {...register(`questions.${idx}.correctIndex`, {
+                          valueAsNumber: true,
+                        })}
+                        defaultChecked={Number(currentCorrect) === i}
+                      />
+                      <input
+                        {...register(`questions.${idx}.options.${i}`)}
+                        placeholder={`Option ${String.fromCharCode(65 + i)}`}
+                        className="flex-1 rounded-md border border-bd bg-surf px-2 py-1 text-xs text-t"
+                      />
+                    </label>
+                  );
+                })}
 
               {type === "tf" && (
                 <div className="flex gap-4 text-xs">

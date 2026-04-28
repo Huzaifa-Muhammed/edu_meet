@@ -10,6 +10,7 @@ import { badRequest } from "@/server/utils/errors";
 const MsgSchema = z.object({
   text: z.string().min(1).max(2000),
   meetingId: z.string().optional(),
+  clientId: z.string().min(1).max(64).optional(),
 });
 
 export async function GET(
@@ -42,6 +43,7 @@ export async function POST(
       classroomId: id,
       meetingId: parsed.data.meetingId ?? null,
       text: parsed.data.text,
+      clientId: parsed.data.clientId,
       senderId: user.uid,
       senderName: user.displayName ?? user.email ?? "User",
       senderRole:

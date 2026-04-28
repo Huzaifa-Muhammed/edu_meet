@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import api from "@/lib/api/client";
+import { useAuth } from "@/providers/auth-provider";
 import type { ChatMessage } from "@/server/services/class-chat.service";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -218,6 +219,7 @@ function InsightsTab({
 
 function ClassChatTab({ classroomId }: { classroomId: string }) {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -232,16 +234,13 @@ function ClassChatTab({ classroomId }: { classroomId: string }) {
     enabled: !!classroomId,
   });
 
-  // Pubsub events after the history was last fetched — treat as ephemeral until
-  // refetch picks them up from Firestore. Also trigger refetch on incoming pubsub
-  // so the list stays consistent.
   useEffect(() => {
     if (pubMsgs.length === 0) return;
     qc.invalidateQueries({ queryKey: ["class-chat", classroomId] });
   }, [pubMsgs.length, classroomId, qc]);
 
-  // Derive display list: merge Firestore history + any pubsub messages newer
-  // than the latest history entry.
+  // Derive display list: merge Firestore history with pubsub messages,
+  // dedup by clientId (preferred) or sender+text+second fingerprint.
   const display = useMemo(() => {
     type Display = {
       id: string;
@@ -249,30 +248,65 @@ function ClassChatTab({ classroomId }: { classroomId: string }) {
       text: string;
       role?: "teacher" | "student" | "admin";
       ts: string;
+      clientId?: string;
     };
+    const fp = (sender: string, text: string, ts: string) =>
+      `${sender}|${text}|${ts.slice(0, 19)}`;
+
     const out: Display[] = history.map((m) => ({
       id: m.id,
       name: m.senderName,
       text: m.text,
       role: m.senderRole,
       ts: m.createdAt,
+      clientId: m.clientId,
     }));
-    const latestHistTs = history[history.length - 1]?.createdAt ?? "";
+    const seenClient = new Set(
+      history.map((m) => m.clientId).filter(Boolean) as string[],
+    );
+    const seenFp = new Set(history.map((m) => fp(m.senderId, m.text, m.createdAt)));
+
     for (const m of pubMsgs) {
-      const payload = m as unknown as {
-        senderName?: string;
-        message: string;
-        timestamp?: string;
-      };
-      const ts = payload.timestamp ?? "";
-      if (ts && ts <= latestHistTs) continue;
+      const raw = m.message as unknown as string;
+      // Modern publishers send JSON; tolerate older plain-text messages.
+      let payload:
+        | {
+            id?: string;
+            clientId?: string;
+            senderUid?: string;
+            senderName?: string;
+            senderRole?: "teacher" | "student" | "admin";
+            text?: string;
+            createdAt?: string;
+          }
+        | null = null;
+      if (typeof raw === "string" && raw.startsWith("{")) {
+        try {
+          payload = JSON.parse(raw);
+        } catch {
+          payload = null;
+        }
+      }
+      const text = payload?.text ?? (typeof raw === "string" ? raw : "");
+      if (!text) continue;
+      const ts = payload?.createdAt ?? new Date().toISOString();
+      const senderUid = payload?.senderUid ?? "";
+      const cid = payload?.clientId;
+      if (cid && seenClient.has(cid)) continue;
+      const f = fp(senderUid, text, ts);
+      if (seenFp.has(f)) continue;
+      seenFp.add(f);
+      if (cid) seenClient.add(cid);
       out.push({
-        id: `live-${ts}-${payload.senderName ?? ""}`,
-        name: payload.senderName ?? "?",
-        text: payload.message,
+        id: cid ?? `live-${ts}-${senderUid}`,
+        name: payload?.senderName ?? "?",
+        text,
+        role: payload?.senderRole,
         ts,
+        clientId: cid,
       });
     }
+    out.sort((a, b) => a.ts.localeCompare(b.ts));
     return out;
   }, [history, pubMsgs]);
 
@@ -281,17 +315,25 @@ function ClassChatTab({ classroomId }: { classroomId: string }) {
   }, [display.length]);
 
   const send = async () => {
-    const m = draft.trim();
-    if (!m) return;
+    const t = draft.trim();
+    if (!t) return;
     setDraft("");
-    // Broadcast instantly
-    publish(m, { persist: true });
-    // Persist to Firestore (best-effort)
+    const clientId = crypto.randomUUID();
+    const payload = {
+      id: clientId,
+      clientId,
+      senderUid: user?.uid,
+      senderName: user?.displayName ?? "Teacher",
+      senderRole: "teacher" as const,
+      text: t,
+      createdAt: new Date().toISOString(),
+    };
+    publish(JSON.stringify(payload), { persist: true });
     try {
-      await api.post(`/classrooms/${classroomId}/chat`, { text: m });
+      await api.post(`/classrooms/${classroomId}/chat`, { text: t, clientId });
       qc.invalidateQueries({ queryKey: ["class-chat", classroomId] });
     } catch {
-      // Network flaky — pubsub still delivered
+      // pubsub still delivered the message
     }
   };
 

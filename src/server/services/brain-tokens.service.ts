@@ -189,19 +189,26 @@ export const brainTokensService = {
   },
 
   /** Total positive amount earned today by a given reason. Used to cap
-   *  game rewards so a student can't farm BT indefinitely. */
+   *  game rewards so a student can't farm BT indefinitely.
+   *
+   *  Combining two `==` filters with a `>=` range filter would require a
+   *  composite index, so we filter on `uid + reason` in Firestore and
+   *  bound the date in-memory. The per-student-per-reason ledger volume
+   *  is tiny so this is cheap. */
   async todayEarnedByReason(uid: string, reason: TokenReason): Promise<number> {
     const todayStart = new Date();
     todayStart.setUTCHours(0, 0, 0, 0);
+    const todayStartIso = todayStart.toISOString();
     const snap = await adminDb
       .collection(Collections.TOKEN_TRANSACTIONS)
       .where("uid", "==", uid)
       .where("reason", "==", reason)
-      .where("createdAt", ">=", todayStart.toISOString())
       .get();
     let total = 0;
     for (const d of snap.docs) {
-      const amt = (d.data() as { amount?: number }).amount ?? 0;
+      const data = d.data() as { amount?: number; createdAt?: string };
+      if (!data.createdAt || data.createdAt < todayStartIso) continue;
+      const amt = data.amount ?? 0;
       if (amt > 0) total += amt;
     }
     return total;
