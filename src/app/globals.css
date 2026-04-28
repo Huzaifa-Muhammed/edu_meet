@@ -1,26 +1,1589 @@
 @import "tailwindcss";
 
+/* ── Design tokens from mockup ── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Backgrounds */
+  --bg: #ECEAE4;
+  --surf: #FFFFFF;
+  --panel: #F4F3EF;
+  --panel2: #EAE8E2;
+
+  /* Borders */
+  --bd: #DDD9D0;
+  --bd2: #C4C0B6;
+
+  /* Text */
+  --t: #1A1916;
+  --t2: #5C584E;
+  --t3: #9C9888;
+
+  /* Accent */
+  --acc: #1A1916;
+  --accbg: #EDECE7;
+
+  /* Sidebar */
+  --side: #F0EEE8;
+  --sidebd: #D8D4CA;
+
+  /* Copilot */
+  --cp: #F2F1F8;
+  --cpbd: #DDD9F0;
+
+  /* Green */
+  --green: #16A34A;
+  --gbg: #F0FDF4;
+  --gbd: #86EFAC;
+  --gt: #15803D;
+
+  /* Blue */
+  --blue: #2563EB;
+  --bbg: #EEF3FD;
+  --bbd: #BFDBFE;
+  --bt: #1D4ED8;
+
+  /* Amber */
+  --amber: #D97706;
+  --abg: #FFFBEB;
+  --abd: #FDE68A;
+  --at: #92400E;
+
+  /* Purple */
+  --purple: #7C3AED;
+  --pbg: #F5F3FF;
+  --pbd: #DDD6FE;
+  --pt: #5B21B6;
+
+  /* Red */
+  --red: #DC2626;
+  --rbg: #FEF2F2;
+  --rbd: #FECACA;
+  --rt: #991B1B;
+
+  /* Topbar / Sidenav dark */
+  --topbar: #252422;
+  --sidenav: #2C2B27;
 }
 
+/* ── Tailwind v4 theme inline ── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-surf: var(--surf);
+  --color-panel: var(--panel);
+  --color-panel2: var(--panel2);
+
+  --color-bd: var(--bd);
+  --color-bd2: var(--bd2);
+
+  --color-t: var(--t);
+  --color-t2: var(--t2);
+  --color-t3: var(--t3);
+
+  --color-acc: var(--acc);
+  --color-accbg: var(--accbg);
+
+  --color-side: var(--side);
+  --color-sidebd: var(--sidebd);
+
+  --color-cp: var(--cp);
+  --color-cpbd: var(--cpbd);
+
+  --color-green: var(--green);
+  --color-gbg: var(--gbg);
+  --color-gbd: var(--gbd);
+  --color-gt: var(--gt);
+
+  --color-blue: var(--blue);
+  --color-bbg: var(--bbg);
+  --color-bbd: var(--bbd);
+  --color-bt: var(--bt);
+
+  --color-amber: var(--amber);
+  --color-abg: var(--abg);
+  --color-abd: var(--abd);
+  --color-at: var(--at);
+
+  --color-purple: var(--purple);
+  --color-pbg: var(--pbg);
+  --color-pbd: var(--pbd);
+  --color-pt: var(--pt);
+
+  --color-red: var(--red);
+  --color-rbg: var(--rbg);
+  --color-rbd: var(--rbd);
+  --color-rt: var(--rt);
+
+  --color-topbar: var(--topbar);
+  --color-sidenav: var(--sidenav);
+
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bd2);
+  border-radius: 2px;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ── Base ── */
+html, body {
+  height: 100%;
+  font-family: var(--font-sans);
+  color: var(--t);
+  background: var(--bg);
+}
+
+/* ── Animations ── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+@keyframes sb-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.25); }
+  50% { box-shadow: 0 0 0 5px rgba(220, 38, 38, 0); }
+}
+
+/* ── Classroom-specific palette (cool neutrals + blue accent) ──
+   Scoped via .classroom-ui wrapper so the rest of the app keeps
+   its warm palette. Tailwind @theme inline tokens reference the
+   plain --bg etc vars, and CSS custom properties cascade, so every
+   bg-bg / text-t2 / bg-acc inside the wrapper renders with these. */
+.classroom-ui {
+  --bg: #F4F5F7;
+  --surf: #FFFFFF;
+  --panel: #F8F9FA;
+  --panel2: #F0F1F3;
+  --bd: #E8EAED;
+  --bd2: #D3D6DB;
+
+  --t: #111827;
+  --t2: #4B5563;
+  --t3: #9CA3AF;
+
+  --acc: #2563EB;
+  --accbg: #EFF6FF;
+
+  --side: #FFFFFF;
+  --sidebd: #E8EAED;
+
+  --cp: #F8F7FF;
+  --cpbd: #E5E3F8;
+
+  --gbg: #F0FDF4;
+  --gbd: #BBF7D0;
+  --gt: #15803D;
+
+  --bbg: #EFF6FF;
+  --bbd: #BFDBFE;
+  --bt: #1D4ED8;
+
+  --abg: #FFFBEB;
+  --abd: #FEF08A;
+  --at: #92400E;
+
+  --pbg: #F5F3FF;
+  --pbd: #DDD6FE;
+  --pt: #6D28D9;
+
+  --rbg: #FFF1F2;
+  --rbd: #FECDD3;
+  --rt: #BE123C;
+
+  --topbar: #1E293B;
+  --sidenav: #1E293B;
+}
+
+/* ── Student classroom: exact mockup class rules (scoped) ──
+   Default theme = LIQUID GLASS (dark navy + translucent panels + cyan accent)
+   Direct port from _design/CVC-SP (17).html. */
+.student-classroom-ui {
+  font-family: "DM Sans", "Nunito", sans-serif;
+  position: relative;
+  color: #FFFFFF;
+  background-color: #0D1B2A;
+  isolation: isolate; /* new stacking context — children render inside */
+}
+/* Mesh layer — actual DOM div `.classroom-mesh` rendered by the page.
+   Kept as a sibling of the panels so it always paints first.
+   Base is a deep navy so panels stay dark when they overlay. */
+.student-classroom-ui .classroom-mesh {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(ellipse 70% 60% at 15% 20%, rgba(94,207,234,0.45) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 70% at 85% 70%, rgba(184,144,255,0.42) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 55% at 50% 55%, rgba(74,232,160,0.22) 0%, transparent 65%),
+    radial-gradient(ellipse 65% 45% at 10% 85%, rgba(255,208,96,0.24) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 60% at 92% 12%, rgba(96,184,255,0.35) 0%, transparent 55%),
+    linear-gradient(135deg, #050B18 0%, #030816 50%, #0A0B22 100%);
+  animation: scMeshShift 18s ease-in-out infinite alternate;
+}
+@keyframes scMeshShift {
+  0%   { transform: scale(1)    translate(0, 0); }
+  33%  { transform: scale(1.05) translate(-1%, 1.5%); }
+  66%  { transform: scale(1.02) translate(1%, -1%); }
+  100% { transform: scale(1.04) translate(-0.5%, 0.5%); }
+}
+/* Noise grain on top of mesh */
+.student-classroom-ui .classroom-mesh::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity: 0.45;
+}
+/* Everything after .classroom-mesh lifts above it */
+.student-classroom-ui > *:not(.classroom-mesh) { position: relative; z-index: 1; }
+
+/* Topbar */
+.student-classroom-ui .topbar { background:#1B3A5C; border-bottom:1px solid #162E4A; display:flex; align-items:center; gap:12px; padding:0 16px; height:50px; flex-shrink:0; z-index:20; }
+.student-classroom-ui .logo { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:rgba(255,255,255,.9); flex-shrink:0; }
+.student-classroom-ui .logo-sq { width:26px; height:26px; background:#0F9E8A; border-radius:8px; display:flex; align-items:center; justify-content:center; }
+.student-classroom-ui .logo-sq svg { width:11px; height:11px; fill:white; }
+.student-classroom-ui .portal-badge { font-size:9px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; background:rgba(37,99,235,.35); border:1px solid rgba(37,99,235,.5); color:#93C5FD; border-radius:8px; padding:2px 7px; }
+.student-classroom-ui .top-mid { flex:1; display:flex; justify-content:center; align-items:center; gap:10px; min-width:0; }
+.student-classroom-ui .lesson-lbl { font-size:12px; font-weight:500; color:rgba(255,255,255,.5); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:320px; }
+.student-classroom-ui .subj-badge { font-size:10px; font-weight:600; background:rgba(37,99,235,.2); color:#93C5FD; border:1px solid rgba(37,99,235,.35); border-radius:4px; padding:2px 7px; }
+.student-classroom-ui .live-pill { display:flex; align-items:center; gap:6px; background:rgba(220,38,38,.15); border:1px solid rgba(220,38,38,.3); border-radius:20px; padding:3px 10px; }
+.student-classroom-ui .live-dot { width:6px; height:6px; border-radius:50%; background:#F87171; animation:scLivePulse 1.5s infinite; }
+.student-classroom-ui .live-lbl { font-size:10px; font-weight:700; color:#F87171; letter-spacing:.6px; }
+.student-classroom-ui .timer-txt { font-size:11px; font-family:"DM Mono",monospace; color:rgba(255,255,255,.4); }
+@keyframes scLivePulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.5;transform:scale(.7);} }
+.student-classroom-ui .top-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.student-classroom-ui .hand-btn { display:flex; align-items:center; gap:6px; border-radius:20px; padding:5px 12px; border:1px solid rgba(255,255,255,.15); background:transparent; font-size:11px; font-weight:500; color:rgba(255,255,255,.6); cursor:pointer; transition:all .15s; }
+.student-classroom-ui .hand-btn:hover, .student-classroom-ui .hand-btn.on { background:rgba(251,191,36,.2); border-color:rgba(251,191,36,.45); color:#FDE68A; }
+.student-classroom-ui .hand-btn.on { box-shadow:0 2px 12px rgba(251,191,36,.3); animation:scHandShake .4s ease; }
+@keyframes scHandShake { 0%,100%{transform:rotate(0);} 25%{transform:rotate(-15deg);} 75%{transform:rotate(15deg);} }
+.student-classroom-ui .mic-btn { width:30px; height:30px; border-radius:50%; border:1.5px solid rgba(255,255,255,.15); background:rgba(34,197,94,.15); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all .15s; color:rgba(255,255,255,.7); }
+.student-classroom-ui .mic-btn.muted { background:rgba(220,38,38,.15); border-color:rgba(220,38,38,.3); color:#F87171; }
+.student-classroom-ui .dash-btn { display:flex; align-items:center; gap:6px; border-radius:20px; padding:5px 12px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.08); font-size:11px; font-weight:600; color:rgba(255,255,255,.75); cursor:pointer; transition:all .15s; }
+.student-classroom-ui .dash-btn:hover { background:rgba(255,255,255,.16); color:white; }
+.student-classroom-ui .leave-btn { border-radius:20px; padding:5px 12px; background:#DC2626; color:white; font-size:11px; font-weight:600; cursor:pointer; border:none; }
+.student-classroom-ui .stu-av { width:28px; height:28px; border-radius:50%; background:#1A7EC8; color:white; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; border:1.5px solid rgba(255,255,255,.2); }
+
+/* Left panel */
+.student-classroom-ui .lp { width:272px; flex-shrink:0; border-right:1px solid #C8DDE9; background:#EBF3F9; display:flex; flex-direction:column; overflow:hidden; }
+.student-classroom-ui .lp-hdr { padding:11px 14px; border-bottom:1px solid #C8DDE9; display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.student-classroom-ui .lp-hdr-title { font-size:12px; font-weight:600; color:#1E2D3D; flex:1; }
+.student-classroom-ui .lp-tabs { display:flex; border-bottom:1px solid #C8DDE9; flex-shrink:0; }
+.student-classroom-ui .lpt { flex:1; padding:8px 2px; text-align:center; font-size:10px; font-weight:600; color:#8A9BAD; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:all .12s; letter-spacing:.1px; text-transform:uppercase; }
+.student-classroom-ui .lpt.on { color:#0F7EA6; border-bottom-color:#0F7EA6; }
+.student-classroom-ui .lpt:hover:not(.on) { color:#4A5C6E; }
+.student-classroom-ui .lp-body { flex:1; overflow-y:auto; display:none; }
+.student-classroom-ui .lp-body.on { display:block; }
+.student-classroom-ui .prog-bar { padding:10px 14px; border-bottom:1px solid #C8DDE9; background:#FFFFFF; }
+.student-classroom-ui .prog-row { display:flex; justify-content:space-between; font-size:10px; color:#8A9BAD; margin-bottom:5px; }
+.student-classroom-ui .prog-track { height:5px; background:#D0DAE8; border-radius:2px; overflow:hidden; }
+.student-classroom-ui .prog-fill { height:100%; background:#1A7EC8; border-radius:2px; transition:width .5s; }
+.student-classroom-ui .topic { border-bottom:1px solid #C8DDE9; }
+.student-classroom-ui .topic-hdr { display:flex; align-items:center; gap:8px; padding:9px 12px; cursor:pointer; transition:background .12s; }
+.student-classroom-ui .topic-hdr:hover { background:#E8EFF7; }
+.student-classroom-ui .topic-hdr.cur { background:linear-gradient(135deg,#1E40AF,#2563EB); }
+.student-classroom-ui .topic-hdr.cur .ttitle { color:white; font-weight:600; }
+.student-classroom-ui .topic-hdr.cur .tsub { color:rgba(255,255,255,.5); }
+.student-classroom-ui .topic-hdr.cur .tchev { color:rgba(255,255,255,.4); }
+.student-classroom-ui .tdot { width:10px; height:10px; border-radius:50%; border:2px solid #A8BAD0; flex-shrink:0; }
+.student-classroom-ui .tdot.done { background:#1A7EC8; border-color:#1A7EC8; }
+.student-classroom-ui .tdot.cur { background:#60A5FA; border-color:#60A5FA; box-shadow:0 0 0 3px rgba(96,165,250,.25); }
+.student-classroom-ui .tlbl { flex:1; min-width:0; }
+.student-classroom-ui .ttitle { font-size:12px; font-weight:500; color:#1E2D3D; }
+.student-classroom-ui .tsub { font-size:10px; color:#8A9BAD; margin-top:1px; }
+.student-classroom-ui .tchev { font-size:12px; color:#8A9BAD; transition:transform .2s; }
+.student-classroom-ui .tchev.open { transform:rotate(90deg); }
+.student-classroom-ui .drawer { overflow:hidden; max-height:0; transition:max-height .28s ease; }
+.student-classroom-ui .drawer.open { max-height:600px; }
+.student-classroom-ui .sub-item { display:flex; align-items:center; gap:8px; padding:6px 12px 6px 30px; cursor:pointer; transition:background .12s; }
+.student-classroom-ui .sub-item:hover { background:#E8EFF7; }
+.student-classroom-ui .sub-item.done .si-n { color:#8A9BAD; text-decoration:line-through; }
+.student-classroom-ui .sub-item.cur { background:#E6F2FB; }
+.student-classroom-ui .sub-item.cur .si-n { color:#135E9A; font-weight:500; }
+.student-classroom-ui .si-check { width:14px; height:14px; border-radius:50%; border:1.5px solid #A8BAD0; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:8px; }
+.student-classroom-ui .si-check.done { background:#1A7EC8; border-color:#1A7EC8; color:white; }
+.student-classroom-ui .si-check.cur { border-color:#1A7EC8; }
+.student-classroom-ui .si-n { font-size:11px; color:#4A5C6E; flex:1; }
+
+/* Notes tab */
+.student-classroom-ui .notes-view-tabs { display:flex; gap:4px; padding:8px 12px 0; }
+.student-classroom-ui .nvt { flex:1; padding:6px 8px; text-align:center; font-size:10px; font-weight:600; color:#8A9BAD; cursor:pointer; border-radius:10px 10px 0 0; transition:all .12s; background:#E8EFF7; border:1px solid #D0DAE8; border-bottom:none; }
+.student-classroom-ui .nvt.active { background:#FFFFFF; color:#0F7EA6; border-color:#0F7EA6; border-bottom:1px solid #FFFFFF; margin-bottom:-1px; }
+.student-classroom-ui .notes-section { display:none; }
+.student-classroom-ui .notes-section.active { display:block; }
+.student-classroom-ui .notes-pad { padding:12px 14px; }
+.student-classroom-ui .note-tags { display:flex; gap:4px; margin-bottom:8px; flex-wrap:wrap; }
+.student-classroom-ui .ntag { font-size:10px; font-weight:600; border-radius:20px; padding:3px 9px; border:1.5px solid #A8BAD0; color:#8A9BAD; cursor:pointer; transition:all .12s; background:transparent; }
+.student-classroom-ui .ntag.on { background:#0F7EA6; color:white; border-color:#0F7EA6; }
+.student-classroom-ui .note-inp-row { display:flex; gap:6px; margin-bottom:10px; }
+.student-classroom-ui .note-inp { flex:1; border:1px solid #D0DAE8; border-radius:14px; padding:7px 12px; font-size:11px; color:#1E2D3D; outline:none; background:#FFFFFF; }
+.student-classroom-ui .note-inp::placeholder { color:#8A9BAD; }
+.student-classroom-ui .note-add { width:28px; height:28px; border-radius:12px; background:#0F7EA6; border:none; cursor:pointer; color:white; font-size:16px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.student-classroom-ui .note-card { background:#FFFFFF; border:1px solid #D0DAE8; border-radius:16px; padding:11px 13px; margin-bottom:7px; transition:box-shadow .2s, transform .15s; }
+.student-classroom-ui .note-card:hover { box-shadow:0 4px 18px rgba(0,0,0,.09); transform:translateY(-1px); }
+.student-classroom-ui .note-card-top { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+.student-classroom-ui .note-tag-badge { font-size:9px; font-weight:700; border-radius:4px; padding:2px 6px; }
+.student-classroom-ui .note-time { font-size:10px; color:#8A9BAD; margin-left:auto; }
+.student-classroom-ui .note-text { font-size:11px; color:#4A5C6E; line-height:1.55; white-space:pre-wrap; }
+.student-classroom-ui .note-code { font-family:"DM Mono",monospace; font-size:10px; background:#E8EFF7; border-radius:4px; padding:2px 7px; display:inline-block; margin-top:3px; color:#1A7EC8; }
+.student-classroom-ui .note-actions { display:flex; align-items:center; gap:8px; margin-top:6px; padding-top:6px; border-top:1px solid #E8EFF7; }
+.student-classroom-ui .note-vis { font-size:9px; font-weight:600; }
+.student-classroom-ui .note-vis.private { color:#8A9BAD; }
+.student-classroom-ui .note-vis.shared { color:#0B7A49; }
+.student-classroom-ui .note-share-btn { font-size:10px; font-weight:600; border-radius:12px; padding:3px 9px; border:1px solid #90C8EE; background:#E6F2FB; color:#135E9A; cursor:pointer; margin-left:auto; }
+.student-classroom-ui .note-share-btn.unshare { background:#F4F7FB; border-color:#D0DAE8; color:#4A5C6E; }
+.student-classroom-ui .notes-public-hdr { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid #C8DDE9; }
+.student-classroom-ui .notes-public-lbl { font-size:10px; font-weight:700; color:#8A9BAD; text-transform:uppercase; letter-spacing:.5px; }
+.student-classroom-ui .notes-public-count { font-size:10px; color:#8A9BAD; }
+.student-classroom-ui .notes-public-list { padding:12px 14px; }
+.student-classroom-ui .note-author { display:flex; align-items:center; gap:6px; margin-top:6px; padding-top:6px; border-top:1px solid #E8EFF7; font-size:10px; color:#4A5C6E; }
+.student-classroom-ui .note-author-av { width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:8.5px; font-weight:700; flex-shrink:0; }
+.student-classroom-ui .notes-empty { padding:20px; text-align:center; color:#8A9BAD; font-size:11px; }
+
+/* Resources */
+.student-classroom-ui .res-pad { padding:12px 14px; }
+.student-classroom-ui .res-section-lbl { font-size:9px; font-weight:700; color:#8A9BAD; text-transform:uppercase; letter-spacing:.7px; margin:10px 0 6px; }
+.student-classroom-ui .res-section-lbl:first-child { margin-top:0; }
+.student-classroom-ui .res-item { background:#FFFFFF; border:1px solid #D0DAE8; border-radius:16px; padding:11px 13px; margin-bottom:7px; display:flex; align-items:center; gap:9px; transition:box-shadow .2s, transform .15s; }
+.student-classroom-ui .res-item:hover { box-shadow:0 4px 18px rgba(0,0,0,.09); transform:translateY(-1px); }
+.student-classroom-ui .res-ico { width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+.student-classroom-ui .res-info { flex:1; min-width:0; }
+.student-classroom-ui .res-title { font-size:11px; font-weight:500; margin-bottom:1px; color:#1E2D3D; }
+.student-classroom-ui .res-sub { font-size:10px; color:#8A9BAD; }
+.student-classroom-ui .res-btn { font-size:10px; font-weight:600; border-radius:12px; padding:4px 11px; border:1px solid #A8BAD0; background:transparent; color:#4A5C6E; cursor:pointer; white-space:nowrap; }
+.student-classroom-ui .res-btn:hover { background:#E8EFF7; }
+
+/* Main panel */
+.student-classroom-ui .main { flex:1; display:flex; flex-direction:column; overflow:hidden; background:#FFFFFF; box-shadow:4px 0 24px rgba(0,0,0,.08),-4px 0 24px rgba(0,0,0,.08); position:relative; z-index:5; min-width:0; }
+.student-classroom-ui .main-tabs { background:#FFFFFF; border-bottom:2px solid #D0DAE8; display:flex; padding:0 14px; flex-shrink:0; }
+.student-classroom-ui .mt { padding:10px 12px; font-size:11px; font-weight:500; color:#8A9BAD; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; transition:all .15s; }
+.student-classroom-ui .mt.on { color:#1A7EC8; border-bottom-color:#1A7EC8; font-weight:600; }
+.student-classroom-ui .mt:hover:not(.on) { color:#4A5C6E; }
+.student-classroom-ui .pane { flex:1; overflow:hidden; display:none; flex-direction:column; min-height:0; }
+.student-classroom-ui .pane.on { display:flex; flex:1; flex-direction:column; min-height:0; }
+.student-classroom-ui .live-stage { background:linear-gradient(135deg,#0D2B45,#0F4C6B,#0E6B7A); position:relative; overflow:hidden; flex-shrink:0; height:320px; }
+.student-classroom-ui .teacher-av-wrap { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
+.student-classroom-ui .teacher-av { width:68px; height:68px; border-radius:50%; background:rgba(255,255,255,.1); border:2px solid rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center; font-size:13px; color:rgba(255,255,255,.7); font-weight:600; }
+.student-classroom-ui .teacher-lbl { font-size:12px; font-weight:500; color:rgba(255,255,255,.5); }
+.student-classroom-ui .screen-badge { position:absolute; top:12px; left:12px; display:flex; align-items:center; gap:5px; background:rgba(0,0,0,.45); backdrop-filter:blur(6px); border-radius:20px; padding:3px 9px; z-index:5; }
+.student-classroom-ui .screen-dot { width:5px; height:5px; border-radius:50%; background:#4ADE80; }
+.student-classroom-ui .screen-lbl { font-size:10px; color:rgba(255,255,255,.65); font-weight:500; }
+.student-classroom-ui .q-overlay { position:absolute; bottom:0; left:0; right:0; background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,.55)); padding:12px 16px; transform:translateY(100%); transition:transform .3s cubic-bezier(.4,0,.2,1); z-index:10; }
+.student-classroom-ui .q-overlay.show { transform:translateY(0); }
+.student-classroom-ui .q-overlay-hdr { font-size:10px; font-weight:700; color:rgba(167,139,250,.8); text-transform:uppercase; letter-spacing:.7px; margin-bottom:6px; }
+.student-classroom-ui .q-overlay-text { font-size:14px; font-weight:600; color:white; line-height:1.45; }
+.student-classroom-ui .q-overlay-code { font-family:"DM Mono",monospace; font-size:13px; background:rgba(255,255,255,.1); border-radius:5px; padding:3px 9px; display:inline-block; margin-top:4px; color:#93C5FD; }
+.student-classroom-ui .live-ctrls { display:flex; align-items:center; gap:7px; padding:8px 14px; border-bottom:1px solid #D0DAE8; background:#F4F7FB; flex-shrink:0; }
+.student-classroom-ui .lc-btn { display:flex; align-items:center; gap:5px; border-radius:20px; padding:5px 10px; border:1px solid #A8BAD0; background:#FFFFFF; font-size:10px; font-weight:600; color:#4A5C6E; cursor:pointer; transition:all .12s; }
+.student-classroom-ui .lc-btn:hover { background:#E8EFF7; transform:translateY(-1px); box-shadow:0 2px 8px rgba(0,0,0,.1); }
+.student-classroom-ui .lc-btn.active { background:#E6F2FB; color:#135E9A; border-color:#90C8EE; }
+.student-classroom-ui .lc-btn.danger { color:#A02828; border-color:#F0AAAA; background:#FDEAEA; }
+.student-classroom-ui .lc-sep { width:1px; height:16px; background:#A8BAD0; }
+.student-classroom-ui .lc-status { margin-left:auto; font-size:10px; color:#8A9BAD; }
+.student-classroom-ui .quiz-timer-bar { height:4px; background:#D0DAE8; flex-shrink:0; overflow:hidden; }
+.student-classroom-ui .quiz-timer-fill { height:100%; background:#1A7EC8; border-radius:0 2px 2px 0; transition:width .5s linear; }
+.student-classroom-ui .notetaker { background:#FFFFFF; border-top:2px solid #D0DAE8; flex-shrink:0; display:flex; flex-direction:column; }
+.student-classroom-ui .nt-hdr { display:flex; align-items:center; gap:8px; padding:9px 13px; border-bottom:1px solid #D0DAE8; background:#F4F7FB; flex-shrink:0; flex-wrap:wrap; }
+.student-classroom-ui .nt-title { font-size:11px; font-weight:700; color:#4A5C6E; flex-shrink:0; }
+.student-classroom-ui .nt-tags { display:flex; gap:4px; flex-wrap:wrap; }
+.student-classroom-ui .nt-tag { font-size:10px; font-weight:600; border-radius:20px; padding:3px 10px; border:1.5px solid #A8BAD0; background:#FFFFFF; color:#8A9BAD; cursor:pointer; transition:all .15s; }
+.student-classroom-ui .nt-tag.on { background:#0F7EA6; color:white; border-color:#0F7EA6; }
+.student-classroom-ui .nt-tag:not(.on):hover { background:#E8EFF7; }
+.student-classroom-ui .nt-area { border:none; resize:none; padding:11px 14px; font-size:12px; font-family:inherit; color:#1E2D3D; line-height:1.65; outline:none; background:#FFFFFF; min-height:90px; width:100%; }
+.student-classroom-ui .nt-area::placeholder { color:#8A9BAD; }
+.student-classroom-ui .nt-area:focus { box-shadow:inset 0 0 0 2px rgba(15,126,166,.2); }
+.student-classroom-ui .nt-footer { display:flex; align-items:center; justify-content:space-between; padding:8px 13px; border-top:1px solid #D0DAE8; background:#F4F7FB; flex-shrink:0; }
+.student-classroom-ui .nt-hint { font-size:10px; color:#8A9BAD; }
+.student-classroom-ui .nt-save { padding:6px 16px; border-radius:20px; background:#0F7EA6; border:none; color:white; font-size:11px; font-weight:600; cursor:pointer; transition:all .15s; }
+.student-classroom-ui .nt-save:hover:not(:disabled) { background:#0B6886; }
+.student-classroom-ui .nt-save:active { transform:scale(.97); }
+.student-classroom-ui .nt-save:disabled { opacity:.5; cursor:not-allowed; }
+
+/* Right panel (6 tabs + header) */
+.student-classroom-ui .rp { width:360px; flex-shrink:0; border-left:1px solid #B8DDD6; background:#EDF6F4; display:flex; flex-direction:column; min-height:0; transition:width .25s cubic-bezier(.4,0,.2,1); }
+.student-classroom-ui .rp.collapsed { width:0; border-left:none; overflow:hidden; }
+.student-classroom-ui .rp-header { display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-bottom:1px solid #B8DDD6; background:linear-gradient(135deg,#E8FAF8,#EDF6F4); flex-shrink:0; }
+.student-classroom-ui .rp-header-title { font-size:11px; font-weight:600; color:#4A5C6E; }
+.student-classroom-ui .rp-toggle { width:26px; height:26px; border-radius:10px; background:rgba(124,58,237,.1); border:1px solid rgba(124,58,237,.2); display:flex; align-items:center; justify-content:center; cursor:pointer; color:#4E2E9A; font-size:10px; transition:all .15s; flex-shrink:0; }
+.student-classroom-ui .rp-toggle:hover { background:rgba(124,58,237,.2); }
+.student-classroom-ui .rp-tabs { display:flex; border-bottom:1px solid #B8DDD6; flex-shrink:0; overflow-x:auto; }
+.student-classroom-ui .rpt { flex:1; min-width:48px; padding:8px 3px; text-align:center; font-size:9px; font-weight:700; color:#8A9BAD; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:all .15s; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
+.student-classroom-ui .rpt.on { color:#1A7EC8; border-bottom-color:#1A7EC8; }
+.student-classroom-ui .rp-pane { flex:1; overflow:hidden; display:none; flex-direction:column; min-height:0; }
+.student-classroom-ui .rp-pane.on { display:flex; flex:1; flex-direction:column; min-height:0; animation:scFade .2s ease; }
+@keyframes scFade { from{opacity:0;transform:translateY(4px);} to{opacity:1;transform:translateY(0);} }
+
+/* Feed */
+.student-classroom-ui .feed-scroll { flex:1; overflow-y:auto; padding:9px; }
+.student-classroom-ui .feed-item { background:#FFFFFF; border:1px solid #D0DAE8; border-radius:14px; padding:10px 11px; margin-bottom:7px; transition:box-shadow .2s, transform .15s; }
+.student-classroom-ui .feed-item:hover { box-shadow:0 4px 18px rgba(0,0,0,.09); transform:translateY(-1px); }
+.student-classroom-ui .feed-item.alert { border-left:2.5px solid #D63B3B; background:#FDEAEA; }
+.student-classroom-ui .feed-item.info { border-left:2.5px solid #1A7EC8; background:#E6F2FB; }
+.student-classroom-ui .feed-item.success { border-left:2.5px solid #0F9E5E; background:#E8FAF2; }
+.student-classroom-ui .feed-item.quiz { border-left:2.5px solid #6D42C8; background:#F0EAFA; }
+.student-classroom-ui .feed-hdr { display:flex; justify-content:space-between; margin-bottom:3px; }
+.student-classroom-ui .feed-title { font-size:11px; font-weight:600; color:#1E2D3D; }
+.student-classroom-ui .feed-time { font-size:9px; color:#8A9BAD; }
+.student-classroom-ui .feed-text { font-size:10.5px; color:#4A5C6E; line-height:1.55; }
+.student-classroom-ui .feed-action { font-size:10px; font-weight:600; color:#1A7EC8; cursor:pointer; margin-top:5px; display:inline-block; text-decoration:underline; text-underline-offset:2px; background:none; border:none; padding:0; }
+
+/* Quiz cards (reuse main-area styles at right-panel size) */
+.student-classroom-ui .quiz-area { flex:1; overflow-y:auto; padding:14px; }
+.student-classroom-ui .quiz-card { background:#FFFFFF; border:1px solid #D0DAE8; border-radius:18px; overflow:hidden; margin-bottom:12px; box-shadow:0 2px 12px rgba(0,0,0,.06); transition:box-shadow .2s, transform .15s; }
+.student-classroom-ui .quiz-card:hover { box-shadow:0 4px 18px rgba(0,0,0,.09); transform:translateY(-1px); }
+.student-classroom-ui .quiz-card-hdr { padding:13px 16px; border-bottom:1px solid #D0DAE8; background:#F4F7FB; display:flex; align-items:center; gap:8px; }
+.student-classroom-ui .quiz-q-num { width:26px; height:26px; border-radius:50%; background:#1A7EC8; color:white; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; flex-shrink:0; }
+.student-classroom-ui .quiz-q-text { font-size:13px; font-weight:600; flex:1; line-height:1.35; color:#1E2D3D; }
+.student-classroom-ui .quiz-diff { font-size:8px; font-weight:700; border-radius:4px; padding:2px 6px; text-transform:uppercase; letter-spacing:.3px; }
+.student-classroom-ui .quiz-diff.easy { background:#E8FAF2; color:#0B7A49; }
+.student-classroom-ui .quiz-diff.medium { background:#FEF6E4; color:#7A4D08; }
+.student-classroom-ui .quiz-diff.hard { background:#FDEAEA; color:#A02828; }
+.student-classroom-ui .quiz-live-chip { font-size:9px; font-weight:700; border-radius:4px; padding:2px 6px; background:#F0EAFA; color:#4E2E9A; border:1px solid #C4A8ED; }
+.student-classroom-ui .quiz-code { font-family:"DM Mono",monospace; font-size:13px; background:#E6F2FB; border:1px solid #90C8EE; border-radius:12px; padding:5px 11px; margin:8px 14px 0; display:inline-block; color:#1A7EC8; }
+.student-classroom-ui .quiz-opts { display:flex; flex-direction:column; gap:5px; padding:10px 12px; }
+.student-classroom-ui .qopt { display:flex; align-items:center; gap:10px; padding:10px 13px; border-radius:9px; border:1.5px solid #D0DAE8; cursor:pointer; transition:all .15s; user-select:none; background:transparent; }
+.student-classroom-ui .qopt:hover:not(.locked) { border-color:#1A7EC8; background:#E6F2FB; transform:translateX(2px); }
+.student-classroom-ui .qopt.selected { border-color:#1A7EC8; background:#E6F2FB; }
+.student-classroom-ui .qopt.correct { border-color:#0F9E5E; background:#E8FAF2; pointer-events:none; }
+.student-classroom-ui .qopt.wrong { border-color:#D63B3B; background:#FDEAEA; pointer-events:none; }
+.student-classroom-ui .qopt.locked { pointer-events:none; opacity:.55; }
+.student-classroom-ui .opt-bubble { width:24px; height:24px; border-radius:50%; border:1.5px solid #A8BAD0; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; flex-shrink:0; transition:all .15s; color:#4A5C6E; }
+.student-classroom-ui .qopt.selected .opt-bubble { background:#1A7EC8; border-color:#1A7EC8; color:white; }
+.student-classroom-ui .qopt.correct .opt-bubble { background:#0F9E5E; border-color:#0F9E5E; color:white; }
+.student-classroom-ui .qopt.wrong .opt-bubble { background:#D63B3B; border-color:#D63B3B; color:white; }
+.student-classroom-ui .opt-txt { font-size:12px; font-weight:500; flex:1; color:#1E2D3D; }
+.student-classroom-ui .quiz-footer { padding:10px 12px; border-top:1px solid #D0DAE8; display:flex; align-items:center; gap:8px; }
+.student-classroom-ui .submit-btn { border-radius:20px; padding:7px 16px; background:#1A7EC8; color:white; border:none; font-size:11px; font-weight:600; cursor:pointer; transition:all .15s; }
+.student-classroom-ui .submit-btn:hover:not(:disabled) { background:#1D4ED8; box-shadow:0 4px 14px rgba(26,126,200,.35); transform:translateY(-1px); }
+.student-classroom-ui .submit-btn:disabled { background:#D0DAE8; color:#8A9BAD; cursor:not-allowed; }
+.student-classroom-ui .quiz-hint { font-size:10px; color:#8A9BAD; }
+.student-classroom-ui .result-pill { display:flex; align-items:center; gap:5px; border-radius:20px; padding:4px 10px; font-size:11px; font-weight:600; }
+.student-classroom-ui .result-pill.correct { background:#E8FAF2; color:#0B7A49; border:1px solid #7EDBB5; }
+.student-classroom-ui .result-pill.wrong { background:#FDEAEA; color:#A02828; border:1px solid #F0AAAA; }
+.student-classroom-ui .result-pill.pending { background:#FEF6E4; color:#7A4D08; border:1px solid #F5D07A; }
+
+/* Progress pane */
+.student-classroom-ui .prog-pane { flex:1; overflow-y:auto; padding:14px; }
+.student-classroom-ui .my-score-card { background:linear-gradient(135deg,#0D3B5E,#1060A0); border-radius:20px; padding:18px; margin-bottom:12px; position:relative; overflow:hidden; }
+.student-classroom-ui .msc-label { font-size:9px; font-weight:700; color:rgba(255,255,255,.45); text-transform:uppercase; letter-spacing:.8px; margin-bottom:6px; }
+.student-classroom-ui .msc-score { font-size:36px; font-weight:700; color:white; letter-spacing:-1px; line-height:1; }
+.student-classroom-ui .msc-sub { font-size:11px; color:rgba(255,255,255,.45); margin-top:4px; }
+.student-classroom-ui .msc-badges { display:flex; gap:6px; margin-top:12px; flex-wrap:wrap; }
+.student-classroom-ui .msc-badge { display:flex; align-items:center; gap:5px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:4px 9px; font-size:10px; color:rgba(255,255,255,.7); font-weight:500; }
+.student-classroom-ui .msc-deco { position:absolute; top:-20px; right:-20px; font-size:80px; opacity:.06; }
+.student-classroom-ui .prog-section { font-size:10px; font-weight:700; color:#8A9BAD; text-transform:uppercase; letter-spacing:.7px; margin:14px 0 7px; }
+.student-classroom-ui .prog-section:first-of-type { margin-top:0; }
+.student-classroom-ui .tp-row { display:flex; align-items:center; gap:9px; margin-bottom:8px; }
+.student-classroom-ui .tp-ico { width:26px; height:26px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+.student-classroom-ui .tp-info { flex:1; min-width:0; }
+.student-classroom-ui .tp-name { font-size:11px; font-weight:500; margin-bottom:4px; color:#1E2D3D; }
+.student-classroom-ui .tp-bar-wrap { height:7px; background:#D0DAE8; border-radius:4px; overflow:hidden; }
+.student-classroom-ui .tp-fill { height:100%; border-radius:3px; transition:width .6s ease; }
+.student-classroom-ui .tp-val { font-size:10px; font-weight:600; font-family:"DM Mono",monospace; color:#4A5C6E; min-width:28px; text-align:right; flex-shrink:0; }
+.student-classroom-ui .qr-row { display:flex; align-items:center; gap:8px; padding:9px 11px; border-radius:14px; border:1px solid #D0DAE8; margin-bottom:5px; background:#F4F7FB; transition:box-shadow .2s, transform .15s; }
+.student-classroom-ui .qr-row:hover { box-shadow:0 2px 10px rgba(0,0,0,.07); transform:translateY(-1px); }
+.student-classroom-ui .qr-num { width:22px; height:22px; border-radius:50%; background:#E8EFF7; border:1px solid #A8BAD0; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:600; flex-shrink:0; color:#4A5C6E; }
+.student-classroom-ui .qr-txt { flex:1; font-size:11px; color:#4A5C6E; }
+.student-classroom-ui .qr-ans { font-size:10px; font-weight:600; }
+.student-classroom-ui .qr-time { font-size:10px; color:#8A9BAD; font-family:"DM Mono",monospace; }
+.student-classroom-ui .streak-card { background:#FFFFFF; border:1px solid #D0DAE8; border-radius:18px; padding:12px 14px; margin-bottom:8px; display:flex; align-items:center; gap:10px; }
+.student-classroom-ui .streak-ico { font-size:24px; flex-shrink:0; }
+.student-classroom-ui .streak-val { font-size:22px; font-weight:700; letter-spacing:-.5px; line-height:1; color:#1E2D3D; }
+.student-classroom-ui .streak-lbl { font-size:10px; color:#8A9BAD; }
+.student-classroom-ui .badges-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:8px; }
+.student-classroom-ui .badge-item { background:#F4F7FB; border:1px solid #D0DAE8; border-radius:14px; padding:10px 7px; text-align:center; }
+.student-classroom-ui .badge-ico { font-size:20px; margin-bottom:3px; }
+.student-classroom-ui .badge-lbl { font-size:9px; font-weight:600; color:#4A5C6E; }
+.student-classroom-ui .badge-item.locked { opacity:.35; filter:grayscale(1); }
+
+/* Chat */
+.student-classroom-ui .chat-pane { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.student-classroom-ui .chat-msgs { flex:1; overflow-y:auto; padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+.student-classroom-ui .msg-row { display:flex; gap:8px; }
+.student-classroom-ui .msg-row.mine { flex-direction:row-reverse; }
+.student-classroom-ui .msg-av { width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:600; flex-shrink:0; margin-top:2px; }
+.student-classroom-ui .msg-body { min-width:0; }
+.student-classroom-ui .msg-name { font-size:10px; color:#8A9BAD; margin-bottom:2px; }
+.student-classroom-ui .msg-row.mine .msg-name { text-align:right; }
+.student-classroom-ui .msg-bubble { font-size:12px; line-height:1.5; padding:8px 11px; max-width:240px; white-space:pre-wrap; word-wrap:break-word; }
+.student-classroom-ui .msg-row:not(.mine) .msg-bubble { background:#F4F7FB; border:1px solid #D0DAE8; border-radius:18px 18px 18px 4px; color:#1E2D3D; }
+.student-classroom-ui .msg-row.mine .msg-bubble { background:#1A7EC8; color:white; border-radius:18px 18px 4px 18px; }
+.student-classroom-ui .msg-teacher { background:#F0EAFA !important; border:1px solid #C4A8ED !important; border-radius:18px 18px 18px 4px; color:#1E2D3D !important; }
+.student-classroom-ui .ask-teacher { display:flex; align-items:center; gap:6px; font-size:10px; font-weight:500; color:#8A9BAD; padding:6px 12px; border-top:1px solid #D0DAE8; background:#F4F7FB; flex-shrink:0; }
+.student-classroom-ui .ask-teacher-btn { font-size:10px; font-weight:600; border-radius:14px; padding:3px 8px; border:1px solid #F5D07A; background:#FEF6E4; color:#7A4D08; cursor:pointer; transition:all .12s; }
+.student-classroom-ui .ask-teacher-btn:hover { background:#C47D0E; color:white; border-color:#C47D0E; }
+.student-classroom-ui .chat-bar { padding:10px 12px; border-top:1px solid #D0DAE8; display:flex; gap:7px; align-items:center; flex-shrink:0; }
+.student-classroom-ui .chat-inp { flex:1; border:1px solid #D0DAE8; border-radius:22px; padding:7px 13px; font-size:12px; color:#1E2D3D; outline:none; transition:border-color .15s; background:#FFFFFF; }
+.student-classroom-ui .chat-inp:focus { border-color:#1A7EC8; }
+.student-classroom-ui .chat-inp::placeholder { color:#8A9BAD; }
+.student-classroom-ui .chat-send { width:30px; height:30px; border-radius:50%; background:#1A7EC8; border:none; cursor:pointer; color:white; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background .15s; }
+.student-classroom-ui .chat-send:hover:not(:disabled) { background:#1D4ED8; }
+.student-classroom-ui .chat-send:disabled { opacity:.5; cursor:not-allowed; }
+
+/* Wallet pane */
+.student-classroom-ui .wt-scroll { overflow-y:auto; flex:1; padding:12px; }
+.student-classroom-ui .wallet-card { background:linear-gradient(135deg,#0D3B5E,#1060A0); border-radius:20px; padding:18px; color:white; }
+.student-classroom-ui .wc-lbl { font-size:10px; font-weight:700; color:rgba(255,255,255,.7); text-transform:uppercase; letter-spacing:.6px; margin-bottom:10px; }
+.student-classroom-ui .wc-bt-row { display:flex; align-items:baseline; gap:6px; }
+.student-classroom-ui .wc-bt-val { font-size:42px; font-weight:900; letter-spacing:-1.5px; font-family:"DM Mono",monospace; }
+.student-classroom-ui .wc-bt-unit { font-size:18px; font-weight:600; color:rgba(255,255,255,.5); }
+.student-classroom-ui .wc-stats { display:flex; gap:8px; margin-top:14px; }
+.student-classroom-ui .wc-stat { flex:1; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.15); border-radius:12px; padding:8px; text-align:center; }
+.student-classroom-ui .wc-sv { font-size:16px; font-weight:700; letter-spacing:-.3px; }
+.student-classroom-ui .wc-sl { font-size:9px; color:rgba(255,255,255,.6); margin-top:2px; }
+.student-classroom-ui .wc-hist { display:flex; align-items:flex-end; gap:3px; margin-top:14px; height:30px; }
+.student-classroom-ui .wc-bar { flex:1; background:rgba(255,255,255,.2); border-radius:2px 2px 0 0; min-height:3px; }
+.student-classroom-ui .wc-bar.active { background:#FDE68A; }
+.student-classroom-ui .wc-hist-row { display:flex; justify-content:space-between; margin-top:4px; }
+.student-classroom-ui .wc-hl { font-size:9px; color:rgba(255,255,255,.4); }
+
+/* Leaderboard + classmates */
+.student-classroom-ui .lb-wrap { padding:10px 10px 0; flex-shrink:0; }
+.student-classroom-ui .lb-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
+.student-classroom-ui .lb-title { font-size:11px; font-weight:700; color:#1E2D3D; }
+.student-classroom-ui .lb-sub { font-size:10px; color:#8A9BAD; }
+.student-classroom-ui .lb-tabs { display:flex; gap:3px; margin-bottom:8px; background:#FFFFFF; border:1px solid #D0DAE8; border-radius:10px; padding:3px; }
+.student-classroom-ui .lb-tab { flex:1; padding:5px 6px; text-align:center; font-size:10px; font-weight:600; color:#8A9BAD; cursor:pointer; border-radius:7px; display:flex; align-items:center; justify-content:center; gap:3px; transition:all .12s; }
+.student-classroom-ui .lb-tab.on { background:#E6F2FB; color:#135E9A; }
+.student-classroom-ui .lb-row { display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:10px; margin-bottom:3px; background:#FFFFFF; border:1px solid #D0DAE8; }
+.student-classroom-ui .lb-row.lb-me { background:#E6F2FB; border-color:#90C8EE; }
+.student-classroom-ui .lb-rk { width:20px; text-align:center; font-size:11px; font-weight:700; color:#8A9BAD; flex-shrink:0; }
+.student-classroom-ui .lb-rk.gold { color:#C47D0E; }
+.student-classroom-ui .lb-rk.silver { color:#6B7280; }
+.student-classroom-ui .lb-rk.bronze { color:#A16B00; }
+.student-classroom-ui .lb-av { width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; flex-shrink:0; }
+.student-classroom-ui .lb-name { flex:1; font-size:11px; font-weight:500; color:#1E2D3D; }
+.student-classroom-ui .lb-you { font-size:9px; background:#1A7EC8; color:white; padding:1px 5px; border-radius:6px; margin-left:4px; }
+.student-classroom-ui .lb-val { font-size:10px; font-weight:700; color:#135E9A; font-family:"DM Mono",monospace; }
+.student-classroom-ui .cm-section { flex:1; overflow:hidden; display:flex; flex-direction:column; border-top:1px solid #B8DDD6; margin-top:6px; }
+.student-classroom-ui .cm-section-lbl { font-size:9px; font-weight:700; color:#8A9BAD; text-transform:uppercase; letter-spacing:.7px; padding:10px 12px 4px; }
+.student-classroom-ui .cm-scroll { flex:1; overflow-y:auto; padding:0 9px 9px; }
+.student-classroom-ui .cm-row { display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:12px; margin-bottom:3px; background:#FFFFFF; border:1px solid #D0DAE8; transition:box-shadow .2s, transform .15s; }
+.student-classroom-ui .cm-row:hover { box-shadow:0 2px 10px rgba(0,0,0,.07); transform:translateY(-1px); }
+.student-classroom-ui .cm-av { width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; flex-shrink:0; }
+.student-classroom-ui .cm-name { font-size:11px; font-weight:500; flex:1; color:#1E2D3D; }
+.student-classroom-ui .cm-status-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.student-classroom-ui .cm-online { background:#0F9E5E; }
+.student-classroom-ui .cm-idle { background:#C47D0E; }
+.student-classroom-ui .cm-away { background:#D63B3B; }
+.student-classroom-ui .cm-score { font-size:10px; font-weight:600; font-family:"DM Mono",monospace; color:#8A9BAD; }
+
+/* ─── Gaming Room pane ─── */
+.student-classroom-ui .gr-shell { flex:1; display:flex; flex-direction:column; overflow:hidden; padding:14px 16px; gap:12px; }
+.student-classroom-ui .gr-hdr { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.student-classroom-ui .gr-title { font-size:15px; font-weight:700; color:#FFFFFF; letter-spacing:-.2px; }
+.student-classroom-ui .gr-sub { font-size:10.5px; color:rgba(255,255,255,.55); margin-top:2px; }
+.student-classroom-ui .gr-pills { display:flex; gap:6px; flex-wrap:wrap; }
+.student-classroom-ui .gr-pill { font-size:11px; font-weight:600; padding:6px 12px; border-radius:20px; background:rgba(8,16,30,0.55); border:1px solid rgba(255,255,255,0.10); color:rgba(255,255,255,0.75); cursor:pointer; transition:all .15s; }
+.student-classroom-ui .gr-pill:hover { background:rgba(14,26,48,0.7); border-color:rgba(94,207,234,0.35); }
+.student-classroom-ui .gr-pill.active { background:rgba(94,207,234,0.22); border-color:rgba(94,207,234,0.55); color:#5ECFEA; box-shadow:0 0 12px rgba(94,207,234,0.25); }
+.student-classroom-ui .gr-body { flex:1; min-height:0; overflow-y:auto; }
+.student-classroom-ui .gr-panel { background:rgba(8,16,30,0.55); border:1px solid rgba(255,255,255,0.10); border-radius:16px; padding:18px; display:flex; flex-direction:column; gap:14px; color:#fff; backdrop-filter:blur(12px); }
+
+/* Word scramble */
+.student-classroom-ui .gr-scr-status { font-size:12px; color:rgba(255,255,255,0.7); text-align:center; font-weight:500; }
+.student-classroom-ui .gr-scr-tiles { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+.student-classroom-ui .gr-scr-tile { width:40px; height:48px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:linear-gradient(135deg, rgba(94,207,234,0.25), rgba(184,144,255,0.20)); border:1px solid rgba(255,255,255,0.20); color:#fff; font-size:20px; font-weight:700; font-family:"DM Mono", monospace; box-shadow:inset 0 1px 0 rgba(255,255,255,0.15), 0 2px 8px rgba(0,0,0,0.3); }
+.student-classroom-ui .gr-scr-ans-row { display:flex; gap:6px; align-items:center; }
+.student-classroom-ui .gr-scr-ans { flex:1; border-radius:12px; padding:10px 14px; background:rgba(8,16,30,0.55); border:1px solid rgba(255,255,255,0.12); color:#fff; font-size:13px; outline:none; text-transform:uppercase; letter-spacing:.5px; transition:all .15s; }
+.student-classroom-ui .gr-scr-ans:focus { border-color:rgba(94,207,234,0.55); box-shadow:0 0 0 3px rgba(94,207,234,0.18); }
+.student-classroom-ui .gr-scr-ans::placeholder { color:rgba(255,255,255,0.35); text-transform:none; letter-spacing:0; }
+.student-classroom-ui .gr-scr-clr { padding:8px 12px; border-radius:10px; background:rgba(8,16,30,0.55); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.75); cursor:pointer; font-size:11px; font-weight:600; }
+.student-classroom-ui .gr-scr-clr:hover { background:rgba(14,26,48,0.7); }
+.student-classroom-ui .gr-scr-sub { padding:8px 14px; border-radius:10px; background:linear-gradient(135deg, rgba(94,207,234,0.70), rgba(184,144,255,0.60)); border:1px solid rgba(255,255,255,0.25); color:#fff; cursor:pointer; font-size:11px; font-weight:700; box-shadow:inset 0 1px 0 rgba(255,255,255,0.25), 0 3px 12px rgba(94,207,234,0.3); }
+.student-classroom-ui .gr-scr-sub:hover:not(:disabled) { box-shadow:inset 0 1px 0 rgba(255,255,255,0.30), 0 5px 18px rgba(94,207,234,0.45); transform:translateY(-1px); }
+.student-classroom-ui .gr-scr-sub:disabled { opacity:0.5; cursor:not-allowed; }
+.student-classroom-ui .gr-scr-score { text-align:center; font-size:11px; color:rgba(255,255,255,0.7); }
+.student-classroom-ui .gr-scr-score b { color:#5ECFEA; font-size:13px; }
+
+/* Memory match */
+.student-classroom-ui .gr-mem-stats { display:flex; justify-content:space-between; font-size:11px; color:rgba(255,255,255,0.7); font-weight:600; padding:4px 8px; }
+.student-classroom-ui .gr-mem-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; max-width:360px; margin:0 auto; }
+.student-classroom-ui .gr-mem-card { aspect-ratio:1; border-radius:12px; background:linear-gradient(135deg, rgba(94,207,234,0.18), rgba(184,144,255,0.14)); border:1px solid rgba(255,255,255,0.15); font-size:26px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,0.9); transition:all .25s; box-shadow:inset 0 1px 0 rgba(255,255,255,0.1), 0 2px 8px rgba(0,0,0,0.3); }
+.student-classroom-ui .gr-mem-card:hover:not(:disabled) { transform:translateY(-1px); border-color:rgba(94,207,234,0.40); }
+.student-classroom-ui .gr-mem-card.flipped { background:linear-gradient(135deg, rgba(94,207,234,0.35), rgba(184,144,255,0.30)); border-color:rgba(94,207,234,0.50); }
+.student-classroom-ui .gr-mem-card.matched { background:linear-gradient(135deg, rgba(74,232,160,0.35), rgba(74,232,160,0.20)); border-color:rgba(74,232,160,0.55); cursor:default; }
+.student-classroom-ui .gr-mem-card:disabled { cursor:not-allowed; }
+.student-classroom-ui .gr-mem-actions { display:flex; justify-content:center; }
+
+/* ══════════════════════════════════════════════════════════════
+   Glass-theme overrides — applied on top of the base structural
+   rules above. These win by source order + same specificity.
+   ══════════════════════════════════════════════════════════════ */
+.student-classroom-ui { color-scheme: dark; }
+.student-classroom-ui .topbar {
+  background: rgba(8,16,30,0.82);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+}
+.student-classroom-ui .lp {
+  background: rgba(11,20,36,0.78);
+  border-right: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+}
+.student-classroom-ui .main {
+  background: rgba(14,24,42,0.72);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    inset 1px 0 0 rgba(255,255,255,0.04),
+    inset -1px 0 0 rgba(255,255,255,0.04),
+    0 8px 48px rgba(0,0,0,0.45);
+  border-left: 1px solid rgba(255,255,255,0.08);
+  border-right: 1px solid rgba(255,255,255,0.08);
+}
+.student-classroom-ui .rp {
+  background: rgba(11,20,36,0.78);
+  border-left: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+}
+.student-classroom-ui .lp-hdr,
+.student-classroom-ui .main-tabs,
+.student-classroom-ui .lp-tabs,
+.student-classroom-ui .rp-tabs,
+.student-classroom-ui .rp-header,
+.student-classroom-ui .live-ctrls,
+.student-classroom-ui .nt-hdr,
+.student-classroom-ui .nt-footer,
+.student-classroom-ui .ask-teacher,
+.student-classroom-ui .chat-bar,
+.student-classroom-ui .quiz-card-hdr {
+  background: rgba(8,16,30,0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.student-classroom-ui .lp-hdr,
+.student-classroom-ui .main-tabs { border-bottom: 1px solid rgba(255,255,255,0.12); }
+.student-classroom-ui .lp-tabs,
+.student-classroom-ui .rp-tabs,
+.student-classroom-ui .rp-header,
+.student-classroom-ui .live-ctrls,
+.student-classroom-ui .nt-hdr { border-bottom: 1px solid rgba(255,255,255,0.10); }
+.student-classroom-ui .nt-footer,
+.student-classroom-ui .ask-teacher,
+.student-classroom-ui .chat-bar,
+.student-classroom-ui .quiz-card-hdr { border-top: 1px solid rgba(255,255,255,0.10); }
+.student-classroom-ui .quiz-card-hdr { border-top: 0; border-bottom: 1px solid rgba(255,255,255,0.10); }
+
+/* Header titles / labels flip to white */
+.student-classroom-ui .lp-hdr-title,
+.student-classroom-ui .rp-header-title,
+.student-classroom-ui .nt-title,
+.student-classroom-ui .lb-title,
+.student-classroom-ui .res-title,
+.student-classroom-ui .ttitle,
+.student-classroom-ui .note-text,
+.student-classroom-ui .opt-txt,
+.student-classroom-ui .quiz-q-text,
+.student-classroom-ui .feed-title,
+.student-classroom-ui .cm-name,
+.student-classroom-ui .lb-name { color: rgba(255,255,255,0.92); }
+
+.student-classroom-ui .lesson-lbl { color: rgba(255,255,255,0.7); }
+.student-classroom-ui .tsub,
+.student-classroom-ui .si-n,
+.student-classroom-ui .note-time,
+.student-classroom-ui .feed-text,
+.student-classroom-ui .feed-time,
+.student-classroom-ui .msg-name,
+.student-classroom-ui .res-sub,
+.student-classroom-ui .nt-hint,
+.student-classroom-ui .lc-status,
+.student-classroom-ui .prog-row,
+.student-classroom-ui .prog-section,
+.student-classroom-ui .res-section-lbl,
+.student-classroom-ui .cm-section-lbl,
+.student-classroom-ui .notes-public-lbl,
+.student-classroom-ui .notes-public-count,
+.student-classroom-ui .tp-name,
+.student-classroom-ui .tp-val,
+.student-classroom-ui .qr-txt,
+.student-classroom-ui .quiz-hint,
+.student-classroom-ui .badge-lbl,
+.student-classroom-ui .streak-lbl,
+.student-classroom-ui .cm-score,
+.student-classroom-ui .lb-sub,
+.student-classroom-ui .wc-sl { color: rgba(255,255,255,0.6); }
+
+/* Cards — dark translucent tiles */
+.student-classroom-ui .quiz-card,
+.student-classroom-ui .note-card,
+.student-classroom-ui .res-item,
+.student-classroom-ui .streak-card,
+.student-classroom-ui .cm-row,
+.student-classroom-ui .qr-row,
+.student-classroom-ui .qopt,
+.student-classroom-ui .badge-item,
+.student-classroom-ui .lb-row {
+  background: rgba(8,16,30,0.55);
+  border: 1px solid rgba(255,255,255,0.10);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 12px rgba(0,0,0,0.35);
+  color: rgba(255,255,255,0.92);
+}
+.student-classroom-ui .quiz-card {
+  background: rgba(10,20,36,0.65);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 24px rgba(0,0,0,0.45);
+}
+.student-classroom-ui .quiz-card:hover,
+.student-classroom-ui .note-card:hover,
+.student-classroom-ui .res-item:hover,
+.student-classroom-ui .feed-item:hover {
+  background: rgba(14,26,48,0.72);
+  border-color: rgba(94,207,234,0.30);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 6px 28px rgba(0,0,0,0.45);
+}
+.student-classroom-ui .lb-row.lb-me {
+  background: rgba(94,207,234,0.18);
+  border-color: rgba(94,207,234,0.45);
+}
+
+/* Quiz answer options */
+.student-classroom-ui .qopt:hover:not(.locked) {
+  background: rgba(255,255,255,0.16);
+  border-color: rgba(94,207,234,0.55);
+}
+.student-classroom-ui .qopt.selected {
+  background: rgba(94,207,234,0.18);
+  border-color: rgba(94,207,234,0.6);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 0 0 2px rgba(94,207,234,0.2);
+}
+.student-classroom-ui .qopt.correct {
+  background: rgba(74,232,160,0.18);
+  border-color: rgba(74,232,160,0.6);
+}
+.student-classroom-ui .qopt.wrong {
+  background: rgba(255,112,128,0.18);
+  border-color: rgba(255,112,128,0.5);
+}
+.student-classroom-ui .opt-bubble { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.35); color: rgba(255,255,255,0.9); }
+.student-classroom-ui .qopt.selected .opt-bubble { background: #5ECFEA; border-color: #5ECFEA; color: #0D1B2A; }
+.student-classroom-ui .qopt.correct .opt-bubble { background: #4AE8A0; border-color: #4AE8A0; color: #0A2A1A; }
+.student-classroom-ui .qopt.wrong .opt-bubble { background: #FF7080; border-color: #FF7080; color: #2A0A10; }
+
+/* Progress hero — vivid gradient glass */
+.student-classroom-ui .my-score-card {
+  background: linear-gradient(135deg, rgba(94,207,234,0.25) 0%, rgba(184,144,255,0.20) 50%, rgba(74,232,160,0.18) 100%);
+  border: 1px solid rgba(255,255,255,0.30);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.30),
+    inset 0 -1px 0 rgba(0,0,0,0.10),
+    0 8px 40px rgba(94,207,234,0.20),
+    0 2px 12px rgba(0,0,0,0.30);
+}
+.student-classroom-ui .msc-badge {
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.20);
+  backdrop-filter: blur(8px);
+  color: rgba(255,255,255,0.9);
+}
+
+/* Live stage: translucent teal/purple */
+.student-classroom-ui .live-stage {
+  background: linear-gradient(135deg, rgba(13,27,42,0.70), rgba(20,40,70,0.65), rgba(30,20,60,0.65));
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+}
+.student-classroom-ui .screen-badge {
+  background: rgba(0,0,0,0.40);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+/* Inputs */
+.student-classroom-ui .chat-inp,
+.student-classroom-ui .note-inp,
+.student-classroom-ui .nt-area {
+  background: rgba(8,16,30,0.55);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: #FFFFFF;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.student-classroom-ui .chat-inp:focus,
+.student-classroom-ui .nt-area:focus {
+  border-color: rgba(94,207,234,0.55);
+  background: rgba(14,26,48,0.70);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(94,207,234,0.18);
+}
+.student-classroom-ui .chat-inp::placeholder,
+.student-classroom-ui .nt-area::placeholder,
+.student-classroom-ui .note-inp::placeholder { color: rgba(255,255,255,0.38); }
+.student-classroom-ui .notetaker {
+  background: rgba(10,20,36,0.65);
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.student-classroom-ui .nt-area { background: transparent; border: none; color: #fff; }
+.student-classroom-ui .nt-area:focus { box-shadow: none; background: rgba(8,16,30,0.30); }
+
+/* Buttons */
+.student-classroom-ui .lc-btn {
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.22);
+  color: rgba(255,255,255,0.85);
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.18);
+}
+.student-classroom-ui .lc-btn:hover {
+  background: rgba(255,255,255,0.20);
+  border-color: rgba(255,255,255,0.38);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 4px 12px rgba(0,0,0,0.20);
+  transform: translateY(-1px);
+}
+.student-classroom-ui .lc-btn.active {
+  background: rgba(94,207,234,0.22);
+  border-color: rgba(94,207,234,0.50);
+  color: #5ECFEA;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.20), 0 0 12px rgba(94,207,234,0.25);
+}
+.student-classroom-ui .lc-btn.danger {
+  background: rgba(255,112,128,0.22);
+  border-color: rgba(255,112,128,0.50);
+  color: #FF7080;
+}
+.student-classroom-ui .lc-sep { background: rgba(255,255,255,0.15); }
+.student-classroom-ui .hand-btn {
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.22);
+}
+.student-classroom-ui .hand-btn.on {
+  background: rgba(255,208,96,0.22);
+  border-color: rgba(255,208,96,0.50);
+  color: #FFD060;
+  box-shadow: 0 0 16px rgba(255,208,96,0.30);
+}
+.student-classroom-ui .submit-btn {
+  background: linear-gradient(135deg, rgba(94,207,234,0.70), rgba(184,144,255,0.60));
+  border: 1px solid rgba(255,255,255,0.30);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 4px 18px rgba(94,207,234,0.30);
+}
+.student-classroom-ui .submit-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(94,207,234,0.85), rgba(184,144,255,0.75));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.40), 0 6px 24px rgba(94,207,234,0.45);
+  transform: translateY(-2px);
+}
+.student-classroom-ui .submit-btn:disabled { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.4); box-shadow: none; }
+.student-classroom-ui .nt-save {
+  background: linear-gradient(135deg, rgba(94,207,234,0.65), rgba(74,232,160,0.55));
+  border: 1px solid rgba(255,255,255,0.28);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 3px 14px rgba(94,207,234,0.25);
+  color: #FFFFFF;
+}
+.student-classroom-ui .nt-save:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(94,207,234,0.80), rgba(74,232,160,0.70));
+}
+.student-classroom-ui .chat-send,
+.student-classroom-ui .note-add {
+  background: rgba(94,207,234,0.50);
+  border: 1px solid rgba(255,255,255,0.28);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
+  color: #FFFFFF;
+}
+.student-classroom-ui .leave-btn { background: linear-gradient(135deg, rgba(255,112,128,0.85), rgba(255,80,100,0.75)); color: #FFFFFF; }
+.student-classroom-ui .dash-btn { background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.22); color: rgba(255,255,255,0.85); }
+.student-classroom-ui .dash-btn:hover { background: rgba(255,255,255,0.18); color: #FFFFFF; }
+.student-classroom-ui .mic-btn { background: rgba(74,232,160,0.18); border-color: rgba(74,232,160,0.35); color: #4AE8A0; }
+.student-classroom-ui .mic-btn.muted { background: rgba(255,112,128,0.18); border-color: rgba(255,112,128,0.35); color: #FF7080; }
+.student-classroom-ui .stu-av { background: rgba(94,207,234,0.70); border: 1.5px solid rgba(255,255,255,0.30); color: #0D1B2A; }
+.student-classroom-ui .note-add, .student-classroom-ui .chat-send:hover:not(:disabled) { background: rgba(94,207,234,0.70); }
+.student-classroom-ui .res-btn { background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.22); color: rgba(255,255,255,0.85); }
+.student-classroom-ui .res-btn:hover { background: rgba(255,255,255,0.18); }
+.student-classroom-ui .note-share-btn { background: rgba(94,207,234,0.18); border-color: rgba(94,207,234,0.40); color: #5ECFEA; }
+.student-classroom-ui .note-share-btn.unshare { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.20); color: rgba(255,255,255,0.6); }
+
+/* Chat bubbles */
+.student-classroom-ui .msg-row:not(.mine) .msg-bubble {
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.20);
+  backdrop-filter: blur(10px);
+  color: #fff;
+}
+.student-classroom-ui .msg-row.mine .msg-bubble {
+  background: linear-gradient(135deg, rgba(94,207,234,0.55), rgba(96,184,255,0.50));
+  border: 1px solid rgba(255,255,255,0.30);
+  color: #FFFFFF;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.student-classroom-ui .msg-teacher {
+  background: rgba(184,144,255,0.15) !important;
+  border-color: rgba(184,144,255,0.30) !important;
+  color: #FFFFFF !important;
+}
+
+/* Tabs + nav */
+.student-classroom-ui .mt,
+.student-classroom-ui .lpt,
+.student-classroom-ui .rpt { color: rgba(255,255,255,0.5); }
+.student-classroom-ui .mt.on,
+.student-classroom-ui .lpt.on,
+.student-classroom-ui .rpt.on { color: #5ECFEA; border-bottom-color: #5ECFEA; }
+.student-classroom-ui .mt:hover:not(.on),
+.student-classroom-ui .lpt:hover:not(.on),
+.student-classroom-ui .rpt:hover:not(.on) { color: rgba(255,255,255,0.8); }
+
+/* Topic accordion */
+.student-classroom-ui .topic { border-bottom: 1px solid rgba(255,255,255,0.08); }
+.student-classroom-ui .topic-hdr { color: rgba(255,255,255,0.85); }
+.student-classroom-ui .topic-hdr:hover { background: rgba(255,255,255,0.07); }
+.student-classroom-ui .topic-hdr.cur {
+  background: linear-gradient(135deg, rgba(94,207,234,0.25), rgba(96,184,255,0.20));
+  backdrop-filter: blur(8px);
+}
+.student-classroom-ui .tdot { border-color: rgba(255,255,255,0.35); }
+.student-classroom-ui .tdot.done { background: #5ECFEA; border-color: #5ECFEA; }
+.student-classroom-ui .tdot.cur { background: #60B8FF; border-color: #60B8FF; box-shadow: 0 0 0 3px rgba(96,184,255,0.25); }
+.student-classroom-ui .sub-item:hover { background: rgba(255,255,255,0.07); }
+.student-classroom-ui .sub-item.cur { background: rgba(94,207,234,0.12); }
+.student-classroom-ui .sub-item.cur .si-n { color: #5ECFEA; }
+.student-classroom-ui .si-check { border-color: rgba(255,255,255,0.35); }
+.student-classroom-ui .si-check.done { background: #5ECFEA; border-color: #5ECFEA; color: #0D1B2A; }
+.student-classroom-ui .tchev { color: rgba(255,255,255,0.45); }
+
+/* Note tag chips + tag badges */
+.student-classroom-ui .ntag,
+.student-classroom-ui .nt-tag {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.20);
+  color: rgba(255,255,255,0.65);
+}
+.student-classroom-ui .ntag.on,
+.student-classroom-ui .nt-tag.on {
+  background: rgba(94,207,234,0.30);
+  border-color: rgba(94,207,234,0.55);
+  color: #5ECFEA;
+  box-shadow: 0 0 10px rgba(94,207,234,0.25);
+}
+.student-classroom-ui .note-tag-badge { opacity: 0.95; }
+
+/* Notes view switcher */
+.student-classroom-ui .nvt { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.15); color: rgba(255,255,255,0.55); border-bottom: none; }
+.student-classroom-ui .nvt.active { background: rgba(94,207,234,0.18); color: #5ECFEA; border-color: rgba(94,207,234,0.45); }
+.student-classroom-ui .notes-public-hdr { border-bottom: 1px solid rgba(255,255,255,0.10); }
+.student-classroom-ui .note-actions { border-top: 1px solid rgba(255,255,255,0.10); }
+.student-classroom-ui .note-code { background: rgba(255,255,255,0.10); color: #60CFFF; border: 1px solid rgba(255,255,255,0.15); }
+.student-classroom-ui .note-vis.private { color: rgba(255,255,255,0.45); }
+.student-classroom-ui .note-vis.shared { color: #4AE8A0; }
+
+/* Logo + badge + live pill + subject badge */
+.student-classroom-ui .logo-sq {
+  background: linear-gradient(135deg, rgba(94,207,234,0.80), rgba(184,144,255,0.70));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.40), 0 4px 14px rgba(94,207,234,0.35);
+}
+.student-classroom-ui .portal-badge {
+  background: rgba(94,207,234,0.20);
+  border-color: rgba(94,207,234,0.40);
+  color: #5ECFEA;
+}
+.student-classroom-ui .subj-badge {
+  background: rgba(94,207,234,0.18);
+  border: 1px solid rgba(94,207,234,0.35);
+  color: #5ECFEA;
+}
+.student-classroom-ui .live-pill {
+  background: rgba(255,112,128,0.18);
+  border-color: rgba(255,112,128,0.38);
+  backdrop-filter: blur(8px);
+}
+.student-classroom-ui .live-lbl { color: #FF7080; }
+.student-classroom-ui .live-dot { background: #FF7080; }
+.student-classroom-ui .timer-txt { color: rgba(255,255,255,0.55); }
+
+/* Feed items — dark tinted cards with vivid left border */
+.student-classroom-ui .feed-item {
+  background: rgba(8,16,30,0.55);
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+}
+.student-classroom-ui .feed-item.alert {
+  background: linear-gradient(to right, rgba(255,112,128,0.18) 0%, rgba(10,20,36,0.60) 55%);
+  border-color: rgba(255,112,128,0.30);
+  border-left: 2.5px solid #FF7080;
+}
+.student-classroom-ui .feed-item.info {
+  background: linear-gradient(to right, rgba(96,184,255,0.18) 0%, rgba(10,20,36,0.60) 55%);
+  border-color: rgba(96,184,255,0.30);
+  border-left: 2.5px solid #60B8FF;
+}
+.student-classroom-ui .feed-item.success {
+  background: linear-gradient(to right, rgba(74,232,160,0.18) 0%, rgba(10,20,36,0.60) 55%);
+  border-color: rgba(74,232,160,0.30);
+  border-left: 2.5px solid #4AE8A0;
+}
+.student-classroom-ui .feed-item.quiz {
+  background: linear-gradient(to right, rgba(184,144,255,0.18) 0%, rgba(10,20,36,0.60) 55%);
+  border-color: rgba(184,144,255,0.30);
+  border-left: 2.5px solid #B890FF;
+}
+.student-classroom-ui .feed-action { color: #5ECFEA; }
+
+/* Progress bars */
+.student-classroom-ui .prog-track,
+.student-classroom-ui .tp-bar-wrap,
+.student-classroom-ui .quiz-timer-bar { background: rgba(255,255,255,0.12); }
+.student-classroom-ui .prog-fill,
+.student-classroom-ui .quiz-timer-fill { background: #5ECFEA; }
+
+/* Quiz difficulty badges + live chip */
+.student-classroom-ui .quiz-diff.easy { background: rgba(74,232,160,0.20); color: #4AE8A0; }
+.student-classroom-ui .quiz-diff.medium { background: rgba(255,208,96,0.20); color: #FFD060; }
+.student-classroom-ui .quiz-diff.hard { background: rgba(255,112,128,0.20); color: #FF7080; }
+.student-classroom-ui .quiz-live-chip { background: rgba(184,144,255,0.20); border-color: rgba(184,144,255,0.40); color: #B890FF; }
+.student-classroom-ui .quiz-q-num { background: rgba(94,207,234,0.70); color: #0D1B2A; }
+.student-classroom-ui .quiz-code { background: rgba(96,184,255,0.15); border: 1px solid rgba(96,184,255,0.30); color: #60B8FF; }
+.student-classroom-ui .result-pill.correct { background: rgba(74,232,160,0.20); border-color: rgba(74,232,160,0.50); color: #4AE8A0; }
+.student-classroom-ui .result-pill.wrong { background: rgba(255,112,128,0.20); border-color: rgba(255,112,128,0.45); color: #FF7080; }
+.student-classroom-ui .result-pill.pending { background: rgba(255,208,96,0.18); border-color: rgba(255,208,96,0.40); color: #FFD060; }
+
+/* Wallet card */
+.student-classroom-ui .wallet-card {
+  background: linear-gradient(135deg, rgba(94,207,234,0.25) 0%, rgba(184,144,255,0.20) 50%, rgba(74,232,160,0.18) 100%);
+  border: 1px solid rgba(255,255,255,0.30);
+  backdrop-filter: blur(24px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.30), 0 8px 40px rgba(94,207,234,0.20);
+}
+.student-classroom-ui .wc-stat { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.18); }
+.student-classroom-ui .wc-bar { background: rgba(255,255,255,0.20); }
+.student-classroom-ui .wc-bar.active { background: #FDE68A; }
+
+/* Leaderboard tabs */
+.student-classroom-ui .lb-tabs {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.student-classroom-ui .lb-tab { color: rgba(255,255,255,0.55); }
+.student-classroom-ui .lb-tab.on { background: rgba(94,207,234,0.22); color: #5ECFEA; }
+.student-classroom-ui .lb-val { color: #5ECFEA; }
+.student-classroom-ui .lb-you { background: #5ECFEA; color: #0D1B2A; }
+
+/* Teacher video stage text */
+.student-classroom-ui .teacher-av { background: rgba(255,255,255,0.10); border: 2px solid rgba(255,255,255,0.20); color: rgba(255,255,255,0.8); }
+.student-classroom-ui .teacher-lbl { color: rgba(255,255,255,0.7); }
+.student-classroom-ui .screen-lbl { color: rgba(255,255,255,0.8); }
+.student-classroom-ui .screen-dot { background: #4AE8A0; }
+
+/* Question overlay on stage */
+.student-classroom-ui .q-overlay {
+  background: linear-gradient(to top, rgba(0,0,0,0.92), rgba(0,0,0,0.55));
+}
+.student-classroom-ui .q-overlay-hdr { color: rgba(184,144,255,0.95); }
+.student-classroom-ui .q-overlay-code { background: rgba(255,255,255,0.10); color: #60B8FF; }
+
+/* rp-header + toggle */
+.student-classroom-ui .rp-header {
+  background: linear-gradient(135deg, rgba(94,207,234,0.12), rgba(184,144,255,0.10));
+}
+.student-classroom-ui .rp-toggle {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.25);
+  color: rgba(255,255,255,0.85);
+}
+.student-classroom-ui .rp-toggle:hover { background: rgba(255,255,255,0.20); }
+
+/* Ask-teacher amber button */
+.student-classroom-ui .ask-teacher { color: rgba(255,255,255,0.6); }
+.student-classroom-ui .ask-teacher-btn {
+  background: rgba(255,208,96,0.20);
+  border-color: rgba(255,208,96,0.40);
+  color: #FFD060;
+}
+.student-classroom-ui .ask-teacher-btn:hover { background: rgba(255,208,96,0.30); color: #FFE080; }
+
+/* Streak card + badges */
+.student-classroom-ui .streak-card { color: #FFFFFF; }
+.student-classroom-ui .streak-val { color: #FFFFFF; }
+.student-classroom-ui .badge-item.locked { opacity: 0.32; filter: grayscale(1); }
+
+/* Empty-state text */
+.student-classroom-ui .notes-empty { color: rgba(255,255,255,0.55); }
+
+/* Scrollbar */
+.student-classroom-ui ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.20); }
+.student-classroom-ui ::-webkit-scrollbar-track { background: transparent; }
+
+/* Classroom palette vars (consumed by a few shared Tailwind-classed
+   components like VideoStage overlays). Values match the glass theme. */
+.student-classroom-ui {
+  --bg: #0D1B2A;
+  --surf: rgba(255,255,255,0.10);
+  --panel: rgba(255,255,255,0.08);
+  --panel2: rgba(255,255,255,0.06);
+  --bd: rgba(255,255,255,0.18);
+  --bd2: rgba(255,255,255,0.30);
+  --t: #FFFFFF;
+  --t2: rgba(255,255,255,0.7);
+  --t3: rgba(255,255,255,0.45);
+  --acc: #5ECFEA;
+  --accbg: rgba(94,207,234,0.18);
+  --side: rgba(255,255,255,0.07);
+  --sidebd: rgba(255,255,255,0.14);
+  --cp: rgba(255,255,255,0.07);
+  --cpbd: rgba(255,255,255,0.14);
+  --green: #4AE8A0; --gbg: rgba(74,232,160,0.15); --gbd: rgba(74,232,160,0.35); --gt: #4AE8A0;
+  --blue: #60B8FF; --bbg: rgba(96,184,255,0.15); --bbd: rgba(96,184,255,0.35); --bt: #60B8FF;
+  --amber: #FFD060; --abg: rgba(255,208,96,0.15); --abd: rgba(255,208,96,0.35); --at: #FFD060;
+  --purple: #B890FF; --pbg: rgba(184,144,255,0.15); --pbd: rgba(184,144,255,0.35); --pt: #B890FF;
+  --red: #FF7080; --rbg: rgba(255,112,128,0.15); --rbd: rgba(255,112,128,0.35); --rt: #FF7080;
+  --topbar: rgba(13,27,42,0.55);
+  --sidenav: rgba(13,27,42,0.55);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FC BARCELONA (Blaugrana) THEME — data-theme="barca"
+   Direct port from _design/CVC-SP (17).html lines 1765–1852.
+   Crimson + barca-blue radial-gradient mesh, gold accent (#FFCD00),
+   dark crimson left rail, dark blue right rail, white main.
+   ══════════════════════════════════════════════════════════════ */
+.student-classroom-ui[data-theme="barca"] { background-color: #0D0814; }
+.student-classroom-ui[data-theme="barca"] .classroom-mesh {
+  background-image:
+    radial-gradient(ellipse 90% 45% at -10% -5%, rgba(139,0,24,0.55) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 70% at 55% 40%, rgba(0,61,160,0.50) 0%, transparent 65%),
+    linear-gradient(180deg, #04080F 0%, #08101E 40%, #0A1428 100%);
+  animation: scMeshShift 22s ease-in-out infinite alternate;
+}
+.student-classroom-ui[data-theme="barca"] .topbar {
+  background: repeating-linear-gradient(90deg,
+    #7A0018 0px, #7A0018 12px,
+    #003080 12px, #003080 24px);
+  border-bottom: 2px solid #C8960A;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.student-classroom-ui[data-theme="barca"] .lp {
+  background: rgba(80,6,18,0.82);
+  border-right: 1px solid rgba(200,150,10,0.30);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.student-classroom-ui[data-theme="barca"] .lp-hdr,
+.student-classroom-ui[data-theme="barca"] .lp-tabs {
+  background: rgba(60,4,14,0.55);
+  border-bottom-color: rgba(200,150,10,0.25);
+}
+.student-classroom-ui[data-theme="barca"] .main {
+  background: #FFFFFF;
+  box-shadow: 0 0 60px rgba(0,0,0,0.5);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-left: 1px solid rgba(200,150,10,0.25);
+  border-right: 1px solid rgba(200,150,10,0.25);
+}
+.student-classroom-ui[data-theme="barca"] .main-tabs {
+  background: #FFFFFF;
+  border-bottom: 2px solid #EEE8D8;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.student-classroom-ui[data-theme="barca"] .mt { color: #5A4040; }
+.student-classroom-ui[data-theme="barca"] .mt.on {
+  color: #8B0018; border-bottom-color: #FFCD00; font-weight: 700;
+}
+.student-classroom-ui[data-theme="barca"] .live-stage {
+  background: linear-gradient(135deg, #4A0610 0%, #8B0020 45%, #003DA0 55%, #002070 100%);
+}
+.student-classroom-ui[data-theme="barca"] .live-ctrls {
+  background: #F8F4F0;
+  border-top: 1px solid #E8DED0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.student-classroom-ui[data-theme="barca"] .lc-btn {
+  background: #FFF; border: 1.5px solid #E0D0C0; color: #3A2020;
+  box-shadow: none;
+}
+.student-classroom-ui[data-theme="barca"] .lc-btn:hover {
+  background: #FFF8E0; border-color: #C8960A; color: #8B0018;
+}
+.student-classroom-ui[data-theme="barca"] .lc-btn.active {
+  background: #FFF8E0; color: #8B0018; border-color: #C8960A;
+  box-shadow: 0 0 12px rgba(200,150,10,0.25);
+}
+.student-classroom-ui[data-theme="barca"] .rp {
+  background: rgba(6,20,80,0.82);
+  border-left: 1px solid rgba(200,150,10,0.30);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.student-classroom-ui[data-theme="barca"] .rp-header {
+  background: rgba(4,14,60,0.60);
+  border-bottom-color: rgba(200,150,10,0.20);
+}
+.student-classroom-ui[data-theme="barca"] .rp-header-title { color: #FFE8A0; }
+.student-classroom-ui[data-theme="barca"] .rp-tabs {
+  background: rgba(4,10,50,0.50);
+  border-bottom-color: rgba(200,150,10,0.20);
+}
+.student-classroom-ui[data-theme="barca"] .lpt.on,
+.student-classroom-ui[data-theme="barca"] .rpt.on {
+  color: #FFCD00; border-bottom-color: #FFCD00;
+}
+.student-classroom-ui[data-theme="barca"] .prog-fill,
+.student-classroom-ui[data-theme="barca"] .quiz-timer-fill {
+  background: linear-gradient(90deg, #8B0018, #FFCD00);
+}
+.student-classroom-ui[data-theme="barca"] .topic-hdr.cur {
+  background: rgba(255,205,0,0.15);
+  border-left: 3px solid #FFCD00;
+}
+.student-classroom-ui[data-theme="barca"] .topic-hdr.cur .ttitle { color: #FFCD00; }
+.student-classroom-ui[data-theme="barca"] .tdot.done {
+  background: #FFCD00; border-color: #FFCD00;
+}
+.student-classroom-ui[data-theme="barca"] .feed-action,
+.student-classroom-ui[data-theme="barca"] .lb-val,
+.student-classroom-ui[data-theme="barca"] .cm-score { color: #FFCD00; }
+.student-classroom-ui[data-theme="barca"] .lb-tab.on {
+  background: rgba(200,150,10,0.20); color: #FFCD00;
+}
+.student-classroom-ui[data-theme="barca"] .lb-row.lb-me {
+  background: linear-gradient(135deg, rgba(139,0,24,0.20), rgba(0,61,160,0.20)) !important;
+  border-color: rgba(200,150,10,0.50) !important;
+}
+.student-classroom-ui[data-theme="barca"] .lb-you {
+  background: rgba(200,150,10,0.20); color: #FFCD00; border-color: rgba(200,150,10,0.40);
+}
+.student-classroom-ui[data-theme="barca"] .wallet-card,
+.student-classroom-ui[data-theme="barca"] .my-score-card {
+  background: linear-gradient(135deg, #4A0610 0%, #6B0A18 40%, #003DA0 60%, #002070 100%);
+  border: 1px solid rgba(200,150,10,0.45);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.20), 0 8px 40px rgba(0,61,160,0.30);
+}
+.student-classroom-ui[data-theme="barca"] .qopt {
+  background: rgba(255,255,255,0.92); border-color: #DDD0C0; color: #1A0C10;
+}
+.student-classroom-ui[data-theme="barca"] .qopt:hover:not(.locked) {
+  border-color: #C8960A; background: #FFF8EE;
+}
+.student-classroom-ui[data-theme="barca"] .opt-bubble {
+  background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.18); color: #1A0C10;
+}
+.student-classroom-ui[data-theme="barca"] .qopt.selected .opt-bubble {
+  background: #C8960A; border-color: #C8960A; color: #FFFFFF;
+}
+.student-classroom-ui[data-theme="barca"] .live-pill {
+  background: rgba(255,205,0,0.15); border-color: rgba(255,205,0,0.40);
+}
+.student-classroom-ui[data-theme="barca"] .live-dot { background: #FFCD00; }
+.student-classroom-ui[data-theme="barca"] .live-lbl { color: #FFCD00; }
+.student-classroom-ui[data-theme="barca"] .logo-sq {
+  background: linear-gradient(135deg, #FFCD00, #C8960A);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.40), 0 4px 14px rgba(200,150,10,0.35);
+}
+.student-classroom-ui[data-theme="barca"] .portal-badge {
+  background: rgba(255,205,0,0.20); border-color: rgba(255,205,0,0.40); color: #FFCD00;
+}
+.student-classroom-ui[data-theme="barca"] .subj-badge {
+  background: rgba(255,205,0,0.18); border-color: rgba(255,205,0,0.40); color: #FFCD00;
+}
+.student-classroom-ui[data-theme="barca"] ::-webkit-scrollbar-thumb {
+  background: rgba(200,150,10,0.35);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SUPERMAN THEME — data-theme="superman"
+   Direct port from _design/CVC-SP (17).html lines 1854–1937.
+   Red + krypton-blue radial-gradient mesh, gold accent (#FFC72C),
+   red topbar w/ yellow border, dark red left rail, dark blue right rail.
+   ══════════════════════════════════════════════════════════════ */
+.student-classroom-ui[data-theme="superman"] { background-color: #08101E; }
+.student-classroom-ui[data-theme="superman"] .classroom-mesh {
+  background-image:
+    radial-gradient(ellipse 90% 45% at -10% -5%, rgba(204,0,0,0.55) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 70% at 55% 40%, rgba(0,45,138,0.50) 0%, transparent 65%),
+    radial-gradient(ellipse 100% 40% at 50% 110%, rgba(74,144,217,0.35) 0%, transparent 55%),
+    linear-gradient(180deg, #04080F 0%, #08101E 40%, #0A1428 100%);
+  animation: scMeshShift 22s ease-in-out infinite alternate;
+}
+.student-classroom-ui[data-theme="superman"] .topbar {
+  background: linear-gradient(135deg, #8B0000 0%, #CC0000 40%, #AA0000 60%, #880000 100%);
+  border-bottom: 2px solid #FFC72C;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.student-classroom-ui[data-theme="superman"] .lp {
+  background: rgba(130,4,4,0.80);
+  border-right: 1px solid rgba(255,199,44,0.25);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.student-classroom-ui[data-theme="superman"] .lp-hdr {
+  background: rgba(90,2,2,0.65);
+  border-bottom-color: rgba(255,199,44,0.20);
+}
+.student-classroom-ui[data-theme="superman"] .lp-tabs {
+  background: rgba(60,1,1,0.50);
+  border-bottom-color: rgba(255,199,44,0.15);
+}
+.student-classroom-ui[data-theme="superman"] .main {
+  background: #FFFFFF;
+  box-shadow: 0 0 60px rgba(0,0,0,0.5);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-left: 1px solid rgba(255,199,44,0.25);
+  border-right: 1px solid rgba(255,199,44,0.25);
+}
+.student-classroom-ui[data-theme="superman"] .main-tabs {
+  background: #FFFFFF;
+  border-bottom: 2px solid #EEE8D8;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.student-classroom-ui[data-theme="superman"] .mt { color: #5A4040; }
+.student-classroom-ui[data-theme="superman"] .mt.on {
+  color: #CC0000; border-bottom-color: #FFC72C; font-weight: 700;
+}
+.student-classroom-ui[data-theme="superman"] .live-stage {
+  background: linear-gradient(135deg, #6B0000 0%, #CC0000 45%, #0033A0 55%, #002080 100%);
+}
+.student-classroom-ui[data-theme="superman"] .live-ctrls {
+  background: #F8F6F0;
+  border-top: 1px solid #EEE0D0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.student-classroom-ui[data-theme="superman"] .lc-btn {
+  background: #FFF; border: 1.5px solid #E0D5C5; color: #0A1428;
+  box-shadow: none;
+}
+.student-classroom-ui[data-theme="superman"] .lc-btn:hover {
+  background: #FFF0D0; border-color: #FFC72C; color: #CC0000;
+}
+.student-classroom-ui[data-theme="superman"] .lc-btn.active {
+  background: #FFF0D0; color: #CC0000; border-color: #FFC72C;
+  box-shadow: 0 0 12px rgba(255,199,44,0.30);
+}
+.student-classroom-ui[data-theme="superman"] .rp {
+  background: rgba(0,35,100,0.82);
+  border-left: 1px solid rgba(255,199,44,0.25);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.student-classroom-ui[data-theme="superman"] .rp-header {
+  background: rgba(0,22,70,0.65);
+  border-bottom-color: rgba(255,199,44,0.20);
+}
+.student-classroom-ui[data-theme="superman"] .rp-header-title { color: #FFE8A0; }
+.student-classroom-ui[data-theme="superman"] .rp-tabs {
+  background: rgba(0,15,55,0.55);
+  border-bottom-color: rgba(255,199,44,0.15);
+}
+.student-classroom-ui[data-theme="superman"] .lpt.on,
+.student-classroom-ui[data-theme="superman"] .rpt.on {
+  color: #FFC72C; border-bottom-color: #FFC72C;
+}
+.student-classroom-ui[data-theme="superman"] .prog-fill { background: #FFC72C; }
+.student-classroom-ui[data-theme="superman"] .quiz-timer-fill {
+  background: linear-gradient(90deg, #CC0000, #FFC72C);
+}
+.student-classroom-ui[data-theme="superman"] .topic-hdr.cur {
+  background: rgba(255,199,44,0.15);
+  border-left: 3px solid #FFC72C;
+}
+.student-classroom-ui[data-theme="superman"] .topic-hdr.cur .ttitle { color: #FFC72C; }
+.student-classroom-ui[data-theme="superman"] .tdot.done {
+  background: #FFC72C; border-color: #FFC72C;
+}
+.student-classroom-ui[data-theme="superman"] .feed-action,
+.student-classroom-ui[data-theme="superman"] .lb-val,
+.student-classroom-ui[data-theme="superman"] .cm-score { color: #FFC72C; }
+.student-classroom-ui[data-theme="superman"] .lb-tab.on {
+  background: rgba(255,199,44,0.18); color: #FFC72C;
+}
+.student-classroom-ui[data-theme="superman"] .lb-row.lb-me {
+  background: linear-gradient(135deg, rgba(204,0,0,0.15), rgba(0,51,160,0.15)) !important;
+  border-color: rgba(255,199,44,0.50) !important;
+}
+.student-classroom-ui[data-theme="superman"] .lb-you {
+  background: rgba(255,199,44,0.18); color: #FFC72C; border-color: rgba(255,199,44,0.40);
+}
+.student-classroom-ui[data-theme="superman"] .wallet-card,
+.student-classroom-ui[data-theme="superman"] .my-score-card {
+  background: linear-gradient(135deg, #6B0000 0%, #CC0000 40%, #0033A0 60%, #001870 100%);
+  border: 1px solid rgba(255,199,44,0.40);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.20), 0 8px 40px rgba(0,51,160,0.30);
+}
+.student-classroom-ui[data-theme="superman"] .qopt {
+  background: rgba(255,255,255,0.92); border-color: #DDD8C8; color: #0A1428;
+}
+.student-classroom-ui[data-theme="superman"] .qopt:hover:not(.locked) {
+  border-color: #FFC72C; background: #FFFBEE;
+}
+.student-classroom-ui[data-theme="superman"] .opt-bubble {
+  background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.18); color: #0A1428;
+}
+.student-classroom-ui[data-theme="superman"] .qopt.selected .opt-bubble {
+  background: #CC0000; border-color: #CC0000; color: #FFFFFF;
+}
+.student-classroom-ui[data-theme="superman"] .live-pill {
+  background: rgba(255,199,44,0.15); border-color: rgba(255,199,44,0.40);
+}
+.student-classroom-ui[data-theme="superman"] .live-dot { background: #FFC72C; }
+.student-classroom-ui[data-theme="superman"] .live-lbl { color: #FFC72C; }
+.student-classroom-ui[data-theme="superman"] .logo-sq {
+  background: linear-gradient(135deg, #FFC72C, #E8A800);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.40), 0 4px 14px rgba(255,199,44,0.35);
+}
+.student-classroom-ui[data-theme="superman"] .portal-badge {
+  background: rgba(255,199,44,0.20); border-color: rgba(255,199,44,0.45); color: #FFC72C;
+}
+.student-classroom-ui[data-theme="superman"] .subj-badge {
+  background: rgba(255,199,44,0.18); border-color: rgba(255,199,44,0.40); color: #FFC72C;
+}
+.student-classroom-ui[data-theme="superman"] ::-webkit-scrollbar-thumb {
+  background: rgba(255,199,44,0.30);
+}
+
+/* Theme switcher button (lives in topbar across all themes) */
+.student-classroom-ui .theme-sw {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.75);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: "DM Sans", sans-serif;
+}
+.student-classroom-ui .theme-sw:hover {
+  background: rgba(255,255,255,0.16);
+  color: #FFFFFF;
+}
+.student-classroom-ui .theme-sw-swatch {
+  width: 14px; height: 14px; border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.30);
+  flex-shrink: 0;
+}
+.student-classroom-ui .theme-sw-swatch.glass {
+  background: linear-gradient(135deg, #5ECFEA 0%, #B890FF 50%, #4AE8A0 100%);
+}
+.student-classroom-ui .theme-sw-swatch.barca {
+  background: linear-gradient(90deg, #6B0A14 50%, #0A1A5C 50%);
+}
+.student-classroom-ui .theme-sw-swatch.superman {
+  background: linear-gradient(135deg, #CC0000 45%, #0033A0 55%);
+}
+.student-classroom-ui .theme-sw-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  background: rgba(13,20,40,0.92);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 10px;
+  padding: 4px;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: 0 12px 36px rgba(0,0,0,0.45);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.student-classroom-ui .theme-sw-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.85);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  font-family: "DM Sans", sans-serif;
+}
+.student-classroom-ui .theme-sw-opt:hover { background: rgba(255,255,255,0.08); }
+.student-classroom-ui .theme-sw-opt.active { background: rgba(255,255,255,0.12); }
+.student-classroom-ui .theme-sw-opt-check {
+  margin-left: auto; opacity: 0; color: #5ECFEA; font-size: 12px;
+}
+.student-classroom-ui .theme-sw-opt.active .theme-sw-opt-check { opacity: 1; }
+
+/* ── Student portal — dark overlay palette from CVC-SP mockup ──
+   Scoped via .student-ui wrapper. Deep navy bg + indigo accent + white text
+   on rgba opacities. All Tailwind bg-bg / text-t / border-bd utilities
+   resolve through the CSS vars below. */
+.student-ui {
+  --bg: #0E0B1E;
+  --surf: rgba(255, 255, 255, 0.04);
+  --panel: rgba(255, 255, 255, 0.03);
+  --panel2: rgba(255, 255, 255, 0.07);
+
+  --bd: rgba(255, 255, 255, 0.07);
+  --bd2: rgba(255, 255, 255, 0.12);
+
+  --t: #FFFFFF;
+  --t2: rgba(255, 255, 255, 0.7);
+  --t3: rgba(255, 255, 255, 0.4);
+
+  /* Indigo accent */
+  --acc: #6366F1;
+  --accbg: rgba(99, 102, 241, 0.12);
+
+  --side: #090718;
+  --sidebd: rgba(255, 255, 255, 0.06);
+
+  /* Copilot-ish — reuse for right sidebar */
+  --cp: #090718;
+  --cpbd: rgba(255, 255, 255, 0.06);
+
+  --gbg: rgba(74, 222, 128, 0.12);
+  --gbd: rgba(74, 222, 128, 0.3);
+  --gt: #4ADE80;
+  --green: #4ADE80;
+
+  --bbg: rgba(99, 102, 241, 0.12);
+  --bbd: rgba(99, 102, 241, 0.3);
+  --bt: #A5B4FC;
+  --blue: #6366F1;
+
+  --abg: rgba(245, 158, 11, 0.12);
+  --abd: rgba(245, 158, 11, 0.3);
+  --at: #F59E0B;
+  --amber: #F59E0B;
+
+  --pbg: rgba(168, 85, 247, 0.12);
+  --pbd: rgba(168, 85, 247, 0.3);
+  --pt: #C4B5FD;
+  --purple: #A855F7;
+
+  --rbg: rgba(239, 68, 68, 0.12);
+  --rbd: rgba(239, 68, 68, 0.3);
+  --rt: #F87171;
+  --red: #EF4444;
+
+  --topbar: #0E0B1E;
+  --sidenav: #090718;
+}
+
+/* Student portal — "Forest" alt theme (unlockable) */
+.student-ui[data-theme="forest"] {
+  --bg: #0B1A10;
+  --side: #06120A;
+  --sidenav: #06120A;
+  --cp: #06120A;
+  --acc: #22C55E;
+  --accbg: rgba(34, 197, 94, 0.12);
+  --bt: #86EFAC;
+  --bbg: rgba(34, 197, 94, 0.12);
+  --bbd: rgba(34, 197, 94, 0.3);
 }
