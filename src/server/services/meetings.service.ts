@@ -143,6 +143,38 @@ export const meetingsService = {
     });
   },
 
+  async kickStudent(meetingId: string, uid: string, teacherUid: string) {
+    const { FieldValue } = await import("firebase-admin/firestore");
+    const ref = adminDb.collection(Collections.MEETINGS).doc(meetingId);
+    const doc = await ref.get();
+    if (!doc.exists) throw notFound("Meeting");
+    const data = doc.data() ?? {};
+    if (data.teacherId !== teacherUid) {
+      const { forbidden } = await import("@/server/utils/errors");
+      throw forbidden("Only the meeting host can remove students");
+    }
+    await ref.update({
+      bannedUids: FieldValue.arrayUnion(uid),
+    });
+    return { meetingId, uid, banned: true };
+  },
+
+  async unkickStudent(meetingId: string, uid: string, teacherUid: string) {
+    const { FieldValue } = await import("firebase-admin/firestore");
+    const ref = adminDb.collection(Collections.MEETINGS).doc(meetingId);
+    const doc = await ref.get();
+    if (!doc.exists) throw notFound("Meeting");
+    const data = doc.data() ?? {};
+    if (data.teacherId !== teacherUid) {
+      const { forbidden } = await import("@/server/utils/errors");
+      throw forbidden("Only the meeting host can readmit students");
+    }
+    await ref.update({
+      bannedUids: FieldValue.arrayRemove(uid),
+    });
+    return { meetingId, uid, banned: false };
+  },
+
   async getAttendance(meetingId: string) {
     const snap = await adminDb
       .collection(Collections.ATTENDANCE_EVENTS)

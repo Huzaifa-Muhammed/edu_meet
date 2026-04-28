@@ -9,7 +9,7 @@ export type ClassNote = {
   text: string;
   authorId: string;
   authorName: string;
-  authorRole: "teacher" | "admin";
+  authorRole: "teacher" | "admin" | "student";
   createdAt: string;
 };
 
@@ -33,7 +33,7 @@ export const classNotesService = {
     text: string;
     authorId: string;
     authorName: string;
-    authorRole: "teacher" | "admin";
+    authorRole: "teacher" | "admin" | "student";
   }): Promise<ClassNote> {
     const data: Omit<ClassNote, "id"> = {
       classroomId: args.classroomId,

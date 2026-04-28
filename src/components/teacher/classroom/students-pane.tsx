@@ -2,9 +2,17 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useMeeting, usePubSub } from "@videosdk.live/react-sdk";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import api from "@/lib/api/client";
-import { Search, MicOff, VideoOff, Star, Users as UsersIcon } from "lucide-react";
+import {
+  Search,
+  MicOff,
+  VideoOff,
+  Star,
+  Users as UsersIcon,
+  UserMinus,
+} from "lucide-react";
 import { RewardModal, type RewardKind } from "./reward-modal";
 import { RewardBroadcast, rewardColor, type BroadcastPayload } from "./reward-broadcast";
 
@@ -15,8 +23,15 @@ type Filter = "all" | "hands" | "away" | "muted";
 type View = "list" | "groups";
 type Lane = "attn" | "ok" | "pool";
 
-export function StudentsPane({ classroomId }: { classroomId: string }) {
+export function StudentsPane({
+  classroomId,
+  meetingId,
+}: {
+  classroomId: string;
+  meetingId: string;
+}) {
   const { participants } = useMeeting();
+  const qc = useQueryClient();
   const [filter, setFilter] = useState<Filter>("all");
   const [view, setView] = useState<View>("list");
   const [query, setQuery] = useState("");
@@ -30,6 +45,32 @@ export function StudentsPane({ classroomId }: { classroomId: string }) {
 
   // Reward broadcast pubsub — everyone in class sees the confetti
   const { publish: publishReward, messages: rewardMsgs } = usePubSub("REWARD");
+
+  // STUDENT_KICK — instant signal so the kicked student leaves immediately;
+  // the durable bannedUids field on the meeting prevents rejoin.
+  const { publish: publishKick } = usePubSub("STUDENT_KICK");
+
+  const kickMut = useMutation({
+    mutationFn: (uid: string) =>
+      api.post(`/meetings/${meetingId}/kick`, { uid, banned: true }),
+    onSuccess: (_data, uid) => {
+      const target = students?.find((s) => s.uid === uid);
+      const name = target?.displayName ?? target?.email ?? "Student";
+      publishKick(
+        JSON.stringify({ uid, name, by: "teacher", at: Date.now() }),
+        { persist: true },
+      );
+      toast.success(`${name} removed from class`);
+      qc.invalidateQueries({ queryKey: ["classroom-students", classroomId] });
+    },
+    onError: (err: Error) => toast.error(err.message ?? "Could not remove student"),
+  });
+
+  const onKickClick = (uid: string, name: string) => {
+    if (kickMut.isPending) return;
+    if (!window.confirm(`Remove ${name} from this class?`)) return;
+    kickMut.mutate(uid);
+  };
 
   // Render broadcast from any incoming REWARD pubsub (teacher sees own too)
   useEffect(() => {
@@ -250,6 +291,10 @@ export function StudentsPane({ classroomId }: { classroomId: string }) {
                     setRewardTarget(r.uid);
                     setRewardOpen(true);
                   }}
+                  onKick={() =>
+                    onKickClick(r.uid, r.displayName ?? r.email ?? "Student")
+                  }
+                  kicking={kickMut.isPending}
                 />
               ))}
               {filtered.length === 0 && (
@@ -384,12 +429,16 @@ function StudentRow({
   onToggle,
   points,
   onReward,
+  onKick,
+  kicking,
 }: {
   row: { uid: string; displayName?: string; email?: string; live: boolean; micOn: boolean };
   checked: boolean;
   onToggle: () => void;
   points: number;
   onReward: () => void;
+  onKick: () => void;
+  kicking: boolean;
 }) {
   const name = row.displayName ?? row.email ?? "Student";
   const score = 50 + ((name.charCodeAt(0) || 65) % 50);
@@ -456,8 +505,13 @@ function StudentRow({
         >
           <MicOff className="h-2.5 w-2.5" />
         </button>
-        <button className="flex h-5 w-5 items-center justify-center rounded bg-panel2 text-t3" title="More">
-          …
+        <button
+          onClick={onKick}
+          disabled={kicking}
+          className="flex h-5 w-5 items-center justify-center rounded border border-rbd bg-rbg text-rt hover:bg-red hover:text-white disabled:opacity-50"
+          title="Remove from class"
+        >
+          <UserMinus className="h-2.5 w-2.5" />
         </button>
       </div>
     </div>

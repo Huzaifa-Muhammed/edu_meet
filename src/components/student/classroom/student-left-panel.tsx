@@ -254,10 +254,13 @@ function NotesTab({ classroomId, meetingId }: { classroomId: string; meetingId: 
     mutationFn: (note: PrivateNote) =>
       api.post(`/classrooms/${classroomId}/notes`, {
         text: note.text,
+        studentNoteId: note.id,
+        meetingId,
       }),
     onSuccess: () => {
       toast.success("Shared with class");
       qc.invalidateQueries({ queryKey: ["class-notes", classroomId] });
+      qc.invalidateQueries({ queryKey: ["student-private-notes", meetingId] });
     },
     onError: (err: Error) => toast.error(err.message),
   });

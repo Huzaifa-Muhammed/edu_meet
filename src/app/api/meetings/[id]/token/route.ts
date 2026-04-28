@@ -19,7 +19,13 @@ export async function GET(
       id: string;
       teacherId: string;
       videosdkRoomId?: string | null;
+      bannedUids?: string[];
     };
+
+    const isHost = user.uid === meeting.teacherId;
+    if (!isHost && meeting.bannedUids?.includes(user.uid)) {
+      throw badRequest("You were removed from this class by the teacher.");
+    }
 
     // Lazy-allocate the videosdk room if the meeting doesn't have one yet
     // (e.g. created before the VIDEOSDK_* env vars were set).
@@ -35,7 +41,7 @@ export async function GET(
       }
     }
 
-    const isMod = user.uid === meeting.teacherId;
+    const isMod = isHost;
     const token = videosdkService.participantToken(roomId, user.uid, isMod);
 
     if (!isMod) {

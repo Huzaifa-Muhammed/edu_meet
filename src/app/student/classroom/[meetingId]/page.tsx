@@ -219,6 +219,7 @@ function ClassroomShell({
     >
       <div className="classroom-mesh" aria-hidden />
       <ModerationReceiver isMod={false} />
+      <KickReceiver myUid={user?.uid} onKicked={onLeave} />
       <StudentClassroomTopbar
         classroomName={classroomName}
         subjectName={subjectName}
@@ -255,4 +256,35 @@ function ClassroomShell({
       </div>
     </div>
   );
+}
+
+/** Listens for STUDENT_KICK pubsub and routes to the dashboard if the
+ *  current student's uid is the target. The teacher also flags the meeting
+ *  with bannedUids so a refresh-and-rejoin attempt is rejected at the
+ *  token endpoint — this listener is just the instant-kick UX. */
+function KickReceiver({
+  myUid,
+  onKicked,
+}: {
+  myUid?: string;
+  onKicked: () => void;
+}) {
+  const { messages } = usePubSub("STUDENT_KICK");
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last || !myUid) return;
+    try {
+      const p = JSON.parse(last.message as unknown as string) as {
+        uid?: string;
+      };
+      if (p.uid === myUid) {
+        toast.error("You were removed from the class by the teacher.");
+        setTimeout(onKicked, 600);
+      }
+    } catch {
+      // skip malformed
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length, myUid]);
+  return null;
 }

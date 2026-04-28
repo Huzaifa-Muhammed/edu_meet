@@ -224,7 +224,9 @@ export function MainArea({
       )}
 
       {tab === "questions" && <QuestionsPane classroomId={classroomId} />}
-      {tab === "students" && <StudentsPane classroomId={classroomId} />}
+      {tab === "students" && (
+        <StudentsPane classroomId={classroomId} meetingId={meetingId} />
+      )}
       {tab === "breakout" && (
         <BreakoutPane meetingId={meetingId} classroomId={classroomId} />
       )}
