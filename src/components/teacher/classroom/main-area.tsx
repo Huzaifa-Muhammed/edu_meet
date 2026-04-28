@@ -8,7 +8,11 @@ import { QuestionsPane } from "./questions-pane";
 import { BreakoutPane } from "./breakout-pane";
 import { Whiteboard } from "./whiteboard";
 import { VideoControlBar } from "./video-control-bar";
-import { AiHighlightsStrip, type RaisedHand } from "./ai-highlights-strip";
+import {
+  AiHighlightsStrip,
+  type RaisedHand,
+  type ActiveReaction,
+} from "./ai-highlights-strip";
 import { SlidePresenter } from "./slide-presenter";
 import { FreezeAnnotate } from "./freeze-annotate";
 import { LaserPointer } from "./laser-pointer";
@@ -82,6 +86,56 @@ export function MainArea({
     publishLowerAll(String(Date.now()), { persist: false });
     setHandsClearedAt(Date.now());
   };
+
+  // ── Live student reactions (Confused / Got it) ─────────────────
+  // Keep latest per (uid + type). A student can be both confused on one
+  // topic and "got it" on another, so we don't collapse types together.
+  // Active reactions auto-expire after 90s if not refreshed.
+  const REACTION_TTL_MS = 90_000;
+  const [reactionTick, setReactionTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setReactionTick((t) => t + 1), 15_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const { messages: reactionMsgs } = usePubSub("REACTION");
+  const reactions = useMemo<ActiveReaction[]>(() => {
+    const now = Date.now();
+    const latest = new Map<
+      string,
+      { uid: string; name: string; type: "ok" | "confused"; state: string; at: number }
+    >();
+    for (const m of reactionMsgs) {
+      try {
+        const p = JSON.parse(m.message as unknown as string) as {
+          uid: string;
+          name: string;
+          type: "ok" | "confused";
+          state?: "active" | "cleared";
+          at: number;
+        };
+        if (!p.uid || !p.type) continue;
+        const key = `${p.uid}:${p.type}`;
+        const prev = latest.get(key);
+        if (prev && prev.at >= p.at) continue;
+        latest.set(key, {
+          uid: p.uid,
+          name: p.name ?? "Student",
+          type: p.type,
+          state: p.state ?? "active",
+          at: p.at,
+        });
+      } catch {
+        // skip
+      }
+    }
+    return [...latest.values()]
+      .filter((r) => r.state === "active" && now - r.at < REACTION_TTL_MS)
+      .map(({ uid, name, type, at }) => ({ uid, name, type, at }))
+      .sort((a, b) => a.at - b.at);
+    // reactionTick keeps the TTL filter live without depending on messages
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reactionMsgs, reactionTick]);
 
   // If container tab switches away and back, participant handshakes keep state
   useEffect(() => {
@@ -163,6 +217,7 @@ export function MainArea({
           <AiHighlightsStrip
             classroomId={classroomId}
             hands={hands}
+            reactions={reactions}
             participantCount={participants.size}
           />
         </div>

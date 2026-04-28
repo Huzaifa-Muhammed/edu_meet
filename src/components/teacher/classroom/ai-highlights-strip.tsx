@@ -9,6 +9,13 @@ import type { ClassQuestion } from "@/server/services/class-questions.service";
 
 export type RaisedHand = { uid: string; name: string; at: number };
 
+export type ActiveReaction = {
+  uid: string;
+  name: string;
+  type: "ok" | "confused";
+  at: number;
+};
+
 type Chip = {
   key: string;
   tone: "red" | "amber" | "green" | "purple" | "blue";
@@ -24,10 +31,12 @@ const OVERDUE_MS = 2 * 60 * 1000; // 2 min pending = overdue
 export function AiHighlightsStrip({
   classroomId,
   hands,
+  reactions = [],
   participantCount,
 }: {
   classroomId: string;
   hands: RaisedHand[];
+  reactions?: ActiveReaction[];
   participantCount: number;
 }) {
   const [now, setNow] = useState(() => Date.now());
@@ -60,6 +69,15 @@ export function AiHighlightsStrip({
     [pending, now],
   );
 
+  const confused = useMemo(
+    () => reactions.filter((r) => r.type === "confused"),
+    [reactions],
+  );
+  const gotIt = useMemo(
+    () => reactions.filter((r) => r.type === "ok"),
+    [reactions],
+  );
+
   const chips: Chip[] = useMemo(() => {
     const out: Chip[] = [];
 
@@ -70,6 +88,16 @@ export function AiHighlightsStrip({
         icon: "⏱️",
         who: q.askedByName,
         msg: `awaiting answer — "${truncate(q.text, 60)}"`,
+      });
+    }
+
+    for (const r of confused) {
+      out.push({
+        key: `confused-${r.uid}`,
+        tone: "red",
+        icon: "😕",
+        who: r.name,
+        msg: "is confused",
       });
     }
 
@@ -96,13 +124,23 @@ export function AiHighlightsStrip({
       });
     }
 
+    for (const r of gotIt) {
+      out.push({
+        key: `gotit-${r.uid}`,
+        tone: "green",
+        icon: "👍",
+        who: r.name,
+        msg: "got it",
+      });
+    }
+
     return out;
-  }, [hands, pending, overdue]);
+  }, [hands, pending, overdue, confused, gotIt]);
 
   async function runAiSummary() {
     setAiLoading(true);
     try {
-      const state = `${participantCount} participants, ${hands.length} hand(s) raised, ${pending.length} pending student question(s) (${overdue.length} overdue >2min).`;
+      const state = `${participantCount} participants, ${hands.length} hand(s) raised, ${confused.length} student(s) confused, ${gotIt.length} signaling "got it", ${pending.length} pending student question(s) (${overdue.length} overdue >2min).`;
       const topQs = pending.slice(0, 5).map((q) => `- ${q.askedByName}: "${q.text}"`).join("\n");
       const token = await getFirebaseAuth().currentUser?.getIdToken();
       const res = await fetch("/api/ai/chat", {

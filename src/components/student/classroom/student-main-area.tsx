@@ -162,29 +162,33 @@ export function StudentMainArea({
     mutationFn: (type: "ok" | "confused") =>
       api.post(`/classrooms/${classroomId}/reactions`, { meetingId, type }),
   });
-  const emitReaction = (type: "ok" | "confused") => {
+  const emitReaction = (
+    type: "ok" | "confused",
+    state: "active" | "cleared",
+  ) => {
     publishReaction(
       JSON.stringify({
         uid: user?.uid,
         name: user?.displayName,
         type,
+        state,
         at: Date.now(),
       }),
-      { persist: false },
+      { persist: true },
     );
-    reactionMut.mutate(type);
+    if (state === "active") reactionMut.mutate(type);
   };
 
   const onConfused = () => {
     const next = !confused;
     setConfused(next);
-    emitReaction("confused");
+    emitReaction("confused", next ? "active" : "cleared");
     toast.success(next ? "😕 Confusion signal sent" : "Flag removed");
   };
   const onGotIt = () => {
     const next = !gotIt;
     setGotIt(next);
-    emitReaction("ok");
+    emitReaction("ok", next ? "active" : "cleared");
     toast.success(next ? "👍 Sent to teacher" : "");
   };
 
