@@ -17,6 +17,7 @@ import { SlidePresenter } from "./slide-presenter";
 import { FreezeAnnotate } from "./freeze-annotate";
 import { LaserPointer } from "./laser-pointer";
 import { CalculatorOverlay } from "./calculator-overlay";
+import { LiveCaptions } from "@/components/shared/live-captions";
 
 type Tab = "video" | "questions" | "students" | "breakout";
 
@@ -202,6 +203,7 @@ export function MainArea({
                 onClose={() => setCalcOpen(false)}
               />
             </LaserPointer>
+            <LiveCaptions />
           </div>
           <VideoControlBar
             boardOn={whiteboardOn}

@@ -12,6 +12,7 @@ import { RewardBroadcast, type BroadcastPayload } from "@/components/teacher/cla
 import { CalculatorOverlay } from "@/components/teacher/classroom/calculator-overlay";
 import { StudentSlideViewer } from "./student-slide-viewer";
 import { GamingPane } from "./gaming-pane";
+import { LiveCaptions } from "@/components/shared/live-captions";
 
 type QuizQ = {
   id: string;
@@ -314,6 +315,7 @@ export function StudentMainArea({
               )}
             </div>
           </LaserPointer>
+          <LiveCaptions />
 
           {whiteboardOpen && (
             <div className="absolute inset-0" style={{ zIndex: 30, background: "rgba(0,0,0,.6)" }}>
