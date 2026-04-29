@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2, Check, X } from "lucide-react";
 import api from "@/lib/api/client";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import type { ClassQuestion } from "@/server/services/class-questions.service";
@@ -16,12 +16,28 @@ export type ActiveReaction = {
   at: number;
 };
 
+export type RejoinRequest = {
+  id: string;
+  uid: string;
+  name: string;
+  email?: string | null;
+  requestedAt: string;
+  status: "pending" | "approved" | "denied";
+};
+
 type Chip = {
   key: string;
   tone: "red" | "amber" | "green" | "purple" | "blue";
   icon: string;
   who?: string;
   msg: string;
+  actions?: {
+    approveLabel?: string;
+    denyLabel?: string;
+    onApprove: () => void;
+    onDeny: () => void;
+    busy?: boolean;
+  };
 };
 
 const OVERDUE_MS = 2 * 60 * 1000; // 2 min pending = overdue
@@ -32,11 +48,19 @@ export function AiHighlightsStrip({
   classroomId,
   hands,
   reactions = [],
+  rejoinRequests = [],
+  onApproveRejoin,
+  onDenyRejoin,
+  rejoinBusy = false,
   participantCount,
 }: {
   classroomId: string;
   hands: RaisedHand[];
   reactions?: ActiveReaction[];
+  rejoinRequests?: RejoinRequest[];
+  onApproveRejoin?: (uid: string) => void;
+  onDenyRejoin?: (uid: string) => void;
+  rejoinBusy?: boolean;
   participantCount: number;
 }) {
   const [now, setNow] = useState(() => Date.now());
@@ -80,6 +104,27 @@ export function AiHighlightsStrip({
 
   const chips: Chip[] = useMemo(() => {
     const out: Chip[] = [];
+
+    // Rejoin requests come first — they need a teacher decision and the
+    // student is sitting on a "waiting for approval" screen.
+    for (const r of rejoinRequests) {
+      out.push({
+        key: `rejoin-${r.uid}`,
+        tone: "purple",
+        icon: "🚪",
+        who: r.name,
+        msg: "asks to rejoin (was removed earlier)",
+        actions: onApproveRejoin && onDenyRejoin
+          ? {
+              approveLabel: "Let in",
+              denyLabel: "Keep out",
+              onApprove: () => onApproveRejoin(r.uid),
+              onDeny: () => onDenyRejoin(r.uid),
+              busy: rejoinBusy,
+            }
+          : undefined,
+      });
+    }
 
     for (const q of overdue) {
       out.push({
@@ -135,12 +180,12 @@ export function AiHighlightsStrip({
     }
 
     return out;
-  }, [hands, pending, overdue, confused, gotIt]);
+  }, [hands, pending, overdue, confused, gotIt, rejoinRequests, onApproveRejoin, onDenyRejoin, rejoinBusy]);
 
   async function runAiSummary() {
     setAiLoading(true);
     try {
-      const state = `${participantCount} participants, ${hands.length} hand(s) raised, ${confused.length} student(s) confused, ${gotIt.length} signaling "got it", ${pending.length} pending student question(s) (${overdue.length} overdue >2min).`;
+      const state = `${participantCount} participants, ${hands.length} hand(s) raised, ${confused.length} student(s) confused, ${gotIt.length} signaling "got it", ${pending.length} pending student question(s) (${overdue.length} overdue >2min), ${rejoinRequests.length} previously-removed student(s) asking to rejoin.`;
       const topQs = pending.slice(0, 5).map((q) => `- ${q.askedByName}: "${q.text}"`).join("\n");
       const token = await getFirebaseAuth().currentUser?.getIdToken();
       const res = await fetch("/api/ai/chat", {
@@ -230,10 +275,32 @@ function HighlightChip({ chip }: { chip: Chip }) {
   const t = tones[chip.tone];
   return (
     <div
-      className="flex-shrink-0 rounded-lg border px-2.5 py-1 text-[11px] leading-[1.4]"
+      className="flex flex-shrink-0 items-center gap-2 rounded-lg border px-2.5 py-1 text-[11px] leading-[1.4]"
       style={{ background: t.bg, color: t.color, borderColor: t.border }}
     >
-      {chip.icon} {chip.who && <strong>{chip.who}</strong>} {chip.msg}
+      <span>
+        {chip.icon} {chip.who && <strong>{chip.who}</strong>} {chip.msg}
+      </span>
+      {chip.actions && (
+        <span className="flex items-center gap-1">
+          <button
+            onClick={chip.actions.onApprove}
+            disabled={chip.actions.busy}
+            className="inline-flex items-center gap-1 rounded-full bg-green-600 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+          >
+            <Check className="h-2.5 w-2.5" />
+            {chip.actions.approveLabel ?? "Approve"}
+          </button>
+          <button
+            onClick={chip.actions.onDeny}
+            disabled={chip.actions.busy}
+            className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+          >
+            <X className="h-2.5 w-2.5" />
+            {chip.actions.denyLabel ?? "Deny"}
+          </button>
+        </span>
+      )}
     </div>
   );
 }

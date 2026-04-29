@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMeeting, usePubSub } from "@videosdk.live/react-sdk";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Check, X } from "lucide-react";
+import api from "@/lib/api/client";
 import { VideoStage } from "./video-stage";
 import { StudentsPane } from "./students-pane";
 import { QuestionsPane } from "./questions-pane";
@@ -12,6 +16,7 @@ import {
   AiHighlightsStrip,
   type RaisedHand,
   type ActiveReaction,
+  type RejoinRequest,
 } from "./ai-highlights-strip";
 import { SlidePresenter } from "./slide-presenter";
 import { FreezeAnnotate } from "./freeze-annotate";
@@ -143,6 +148,59 @@ export function MainArea({
     // no-op — placeholder for future cleanup
   }, [tab]);
 
+  // ── Rejoin requests from previously-banned students ──────────────
+  // Polled every 10s. The classroom tab is always open while teaching, so
+  // polling is fine (and matches the AI Highlights cadence). When a NEW
+  // uid appears in the list, fire a toast.
+  const qc = useQueryClient();
+  const seenRejoinIdsRef = useRef<Set<string>>(new Set());
+  const rejoinInitializedRef = useRef(false);
+  const { data: rejoinRequests = [] } = useQuery<RejoinRequest[]>({
+    queryKey: ["rejoin-requests", meetingId],
+    queryFn: () =>
+      api.get(
+        `/meetings/${meetingId}/rejoin-requests`,
+      ) as unknown as Promise<RejoinRequest[]>,
+    enabled: !!meetingId,
+    refetchInterval: 10_000,
+  });
+
+  useEffect(() => {
+    const seen = seenRejoinIdsRef.current;
+    const isFirstRun = !rejoinInitializedRef.current;
+    for (const r of rejoinRequests) {
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
+      // Skip toast on first hydration so reloading the page doesn't
+      // re-pop notifications for already-known pending requests.
+      if (isFirstRun) continue;
+      toast.info(`${r.name} is asking to rejoin the class`, {
+        duration: 8000,
+      });
+    }
+    rejoinInitializedRef.current = true;
+  }, [rejoinRequests]);
+
+  const rejoinMut = useMutation({
+    mutationFn: ({ uid, action }: { uid: string; action: "approve" | "deny" }) =>
+      api.post(`/meetings/${meetingId}/rejoin-requests`, { uid, action }),
+    onSuccess: (_data, { uid, action }) => {
+      const target = rejoinRequests.find((r) => r.uid === uid);
+      const name = target?.name ?? "Student";
+      toast.success(
+        action === "approve" ? `${name} can rejoin` : `${name}'s request declined`,
+      );
+      qc.invalidateQueries({ queryKey: ["rejoin-requests", meetingId] });
+    },
+    onError: (err: Error) =>
+      toast.error(err.message ?? "Could not update request"),
+  });
+
+  const onApproveRejoin = (uid: string) =>
+    rejoinMut.mutate({ uid, action: "approve" });
+  const onDenyRejoin = (uid: string) =>
+    rejoinMut.mutate({ uid, action: "deny" });
+
   return (
     <main
       className="relative z-[5] flex flex-1 flex-col overflow-hidden bg-surf"
@@ -177,6 +235,14 @@ export function MainArea({
           min-height so the calculator renders at a usable size. */}
       {tab === "video" && (
         <div className="flex flex-1 flex-col overflow-y-auto">
+          {rejoinRequests.length > 0 && (
+            <RejoinRequestsBanner
+              requests={rejoinRequests}
+              onApprove={onApproveRejoin}
+              onDeny={onDenyRejoin}
+              busy={rejoinMut.isPending}
+            />
+          )}
           <div
             className="relative flex-shrink-0 p-2.5 pb-4"
             style={{ height: 545 }}
@@ -220,6 +286,10 @@ export function MainArea({
             classroomId={classroomId}
             hands={hands}
             reactions={reactions}
+            rejoinRequests={rejoinRequests}
+            onApproveRejoin={onApproveRejoin}
+            onDenyRejoin={onDenyRejoin}
+            rejoinBusy={rejoinMut.isPending}
             participantCount={participants.size}
           />
         </div>
@@ -233,6 +303,67 @@ export function MainArea({
         <BreakoutPane meetingId={meetingId} classroomId={classroomId} />
       )}
     </main>
+  );
+}
+
+function RejoinRequestsBanner({
+  requests,
+  onApprove,
+  onDeny,
+  busy,
+}: {
+  requests: RejoinRequest[];
+  onApprove: (uid: string) => void;
+  onDeny: (uid: string) => void;
+  busy: boolean;
+}) {
+  return (
+    <div
+      className="flex flex-shrink-0 flex-col gap-1.5 border-b border-amber-300 px-3 py-2"
+      style={{
+        background:
+          "linear-gradient(90deg, rgba(254,243,199,0.95), rgba(254,249,195,0.95))",
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-[.4px] text-amber-900">
+          🚪 Rejoin requests
+        </span>
+        <span className="text-[10px] text-amber-800/80">
+          {requests.length} student{requests.length === 1 ? "" : "s"} waiting to come back
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {requests.map((r) => (
+          <div
+            key={r.id}
+            className="flex items-center gap-2 rounded-full border border-amber-300 bg-white/80 px-2.5 py-1 text-[11px]"
+          >
+            <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-amber-200 text-[9px] font-bold text-amber-900">
+              {r.name.slice(0, 2).toUpperCase()}
+            </div>
+            <span className="font-medium text-amber-900">{r.name}</span>
+            <span className="text-amber-800/70">wants to rejoin</span>
+            <button
+              onClick={() => onApprove(r.uid)}
+              disabled={busy}
+              className="ml-1 inline-flex h-5 items-center gap-1 rounded-full bg-green-600 px-2 text-[10px] font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+              title="Approve and unban"
+            >
+              <Check className="h-2.5 w-2.5" /> Approve
+            </button>
+            <button
+              onClick={() => onDeny(r.uid)}
+              disabled={busy}
+              className="inline-flex h-5 items-center gap-1 rounded-full border border-red-300 bg-red-50 px-2 text-[10px] font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+              title="Decline — student stays banned"
+            >
+              <X className="h-2.5 w-2.5" /> Deny
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

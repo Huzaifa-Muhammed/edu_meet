@@ -33,4 +33,5 @@ export const Collections = {
   SUPPORT_TICKETS: "supportTickets",
   STUDENT_NOTES: "studentNotes",
   REACTIONS: "reactions",
+  REJOIN_REQUESTS: "rejoinRequests",
 } as const;

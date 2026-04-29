@@ -182,4 +182,154 @@ export const meetingsService = {
       .get();
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   },
+
+  /** Banned student files a rejoin request. Idempotent — repeated calls
+   *  refresh the timestamp + reset status to pending. Returns the stored
+   *  status. Throws notFound if the meeting doesn't exist; returns
+   *  status:"not-banned" when the caller wasn't actually banned (so the
+   *  student page can fall through and just retry the token endpoint). */
+  async requestRejoin(
+    meetingId: string,
+    uid: string,
+    name: string,
+    email?: string,
+  ) {
+    const meetingRef = adminDb.collection(Collections.MEETINGS).doc(meetingId);
+    const meeting = await meetingRef.get();
+    if (!meeting.exists) throw notFound("Meeting");
+    const data = meeting.data() ?? {};
+    const banned = (data.bannedUids as string[] | undefined) ?? [];
+    if (!banned.includes(uid)) {
+      return { meetingId, uid, status: "not-banned" as const };
+    }
+
+    const reqId = `${meetingId}_${uid}`;
+    const reqRef = adminDb.collection(Collections.REJOIN_REQUESTS).doc(reqId);
+    await reqRef.set(
+      {
+        meetingId,
+        uid,
+        name,
+        email: email ?? null,
+        requestedAt: new Date().toISOString(),
+        status: "pending",
+        processedAt: null,
+        processedBy: null,
+      },
+      { merge: true },
+    );
+    return { meetingId, uid, status: "pending" as const };
+  },
+
+  async getRejoinRequest(meetingId: string, uid: string) {
+    const reqId = `${meetingId}_${uid}`;
+    const doc = await adminDb
+      .collection(Collections.REJOIN_REQUESTS)
+      .doc(reqId)
+      .get();
+    if (!doc.exists) return null;
+    return { id: doc.id, ...doc.data() };
+  },
+
+  async listPendingRejoinRequests(meetingId: string, teacherUid: string) {
+    const meeting = await adminDb
+      .collection(Collections.MEETINGS)
+      .doc(meetingId)
+      .get();
+    if (!meeting.exists) throw notFound("Meeting");
+    const data = meeting.data() ?? {};
+    if (data.teacherId !== teacherUid) {
+      const { forbidden } = await import("@/server/utils/errors");
+      throw forbidden("Only the meeting host can view rejoin requests");
+    }
+
+    // Single equality filter avoids needing a composite index. Filter +
+    // sort in-memory; per-meeting volume is small.
+    const snap = await adminDb
+      .collection(Collections.REJOIN_REQUESTS)
+      .where("meetingId", "==", meetingId)
+      .get();
+
+    type PendingRow = {
+      id: string;
+      meetingId: string;
+      uid: string;
+      name: string;
+      email?: string | null;
+      requestedAt: string;
+      status: "pending" | "approved" | "denied";
+    };
+    const rows = snap.docs.map((d) => {
+      const row = d.data() as Omit<PendingRow, "id">;
+      return { id: d.id, ...row };
+    });
+    return rows
+      .filter((r) => r.status === "pending")
+      .sort((a, b) =>
+        String(b.requestedAt ?? "").localeCompare(String(a.requestedAt ?? "")),
+      );
+  },
+
+  async approveRejoinRequest(
+    meetingId: string,
+    uid: string,
+    teacherUid: string,
+  ) {
+    const { FieldValue } = await import("firebase-admin/firestore");
+    const meetingRef = adminDb.collection(Collections.MEETINGS).doc(meetingId);
+    const meeting = await meetingRef.get();
+    if (!meeting.exists) throw notFound("Meeting");
+    const data = meeting.data() ?? {};
+    if (data.teacherId !== teacherUid) {
+      const { forbidden } = await import("@/server/utils/errors");
+      throw forbidden("Only the meeting host can approve rejoin requests");
+    }
+
+    await meetingRef.update({
+      bannedUids: FieldValue.arrayRemove(uid),
+    });
+
+    const reqId = `${meetingId}_${uid}`;
+    await adminDb
+      .collection(Collections.REJOIN_REQUESTS)
+      .doc(reqId)
+      .set(
+        {
+          status: "approved",
+          processedAt: new Date().toISOString(),
+          processedBy: teacherUid,
+        },
+        { merge: true },
+      );
+    return { meetingId, uid, status: "approved" as const };
+  },
+
+  async denyRejoinRequest(
+    meetingId: string,
+    uid: string,
+    teacherUid: string,
+  ) {
+    const meetingRef = adminDb.collection(Collections.MEETINGS).doc(meetingId);
+    const meeting = await meetingRef.get();
+    if (!meeting.exists) throw notFound("Meeting");
+    const data = meeting.data() ?? {};
+    if (data.teacherId !== teacherUid) {
+      const { forbidden } = await import("@/server/utils/errors");
+      throw forbidden("Only the meeting host can deny rejoin requests");
+    }
+
+    const reqId = `${meetingId}_${uid}`;
+    await adminDb
+      .collection(Collections.REJOIN_REQUESTS)
+      .doc(reqId)
+      .set(
+        {
+          status: "denied",
+          processedAt: new Date().toISOString(),
+          processedBy: teacherUid,
+        },
+        { merge: true },
+      );
+    return { meetingId, uid, status: "denied" as const };
+  },
 };
