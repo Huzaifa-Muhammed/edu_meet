@@ -4,7 +4,171 @@
 
 ---
 
-## Last Updated: 2026-04-27 (session 5.7 — student classroom themes + 2 more gaming-room games)
+## Last Updated: 2026-04-28 (session 6 — student⇄teacher A/V fixes + reactions surfaced + bug bash + ask-teacher + remove students + student note-share + live captions/translate)
+
+---
+
+## Session 6 (2026-04-28) — Live A/V plumbing, reactions surfacing, bug bash, classroom interaction polish, live captions
+
+Six discrete commits today, in chronological order. All on `main`, pushed (working tree clean at session end).
+
+### 6.1 — `9ecab2f` Fix: students now hear teacher mic + see teacher screen share
+
+**Problem.** Participant tiles only piped the **webcam** track into the `MediaStream` — `mic` and `screenShareAudio` tracks were never attached, so:
+- Students couldn't hear the teacher
+- The student-side `TeacherTile` didn't render screen share at all
+
+**Fix in `src/components/teacher/classroom/video-stage.tsx` and `src/components/student/classroom/student-main-area.tsx`:**
+
+- **Teacher side** — added `ParticipantAudio` component that plays each remote participant's mic via a dedicated `<audio>` element. Self-tile is skipped to avoid local mic echo. Video tiles are now always `video-muted` since audio rides on the separate `<audio>`.
+- **Student side** — added `RoomAudioMixer` that mounts a hidden `<audio>` per non-local participant, covering teacher mic + peer mics in one place.
+- **Screen share visibility** — student `TeacherTile` now picks the screen-share stream first, falls back to webcam, then falls back to initials avatar. Resolves the "teacher is sharing but I see nothing" complaint.
+- **System audio over screen share** — `screenShareAudioStream` is piped through its own audio element on both sides so a teacher playing a video while sharing is actually audible.
+
+**Net delta:** +161 / −13 across 2 files. No schema/route changes.
+
+### 6.2 — `286624b` Surface student Confused / Got it reactions in teacher AI Highlights
+
+**Problem.** Confused/Got-it reactions emitted by students were only consumed by the comprehension modal — teachers had no passive in-band awareness during class.
+
+**Fix:**
+
+- **Student** (`student-main-area.tsx`) now publishes `REACTION` with explicit `{ state: "active" | "cleared" }` so toggling a reaction off propagates to the teacher. `persist:true` so late-joining teacher tabs see in-flight signals.
+- **Teacher** (`main-area.tsx`) aggregates **latest-per-(uid+type)**, filters to active reactions in the **last 90 seconds**, and passes the list to `AiHighlights`.
+- **`ai-highlights-strip.tsx`** renders 😕 confused chips (red) and 👍 got-it chips (green) alongside the existing hands + question signals. The Ask-AI prompt template now references reaction counts so the AI suggestion accounts for them.
+
+**Net delta:** +105 / −8 across 3 files.
+
+### 6.3 — `5d75f5d` Fix: games claim 500, AI MCQ correct-index, chat duplicates, support form
+
+Four independent bugs, all surfaced in a screenshot the user attached (kept in the repo at `_design/...4.41.07 PM.jpeg`):
+
+**A. Game claim returned 500** — `todayEarnedByReason` in `brain-tokens.service.ts` was combining two `==` filters with a `>=` range filter on the same query, requiring a Firestore composite index that didn't exist. Switched to filtering on `uid + reason` only and bounding the date **in-memory** (per-student-per-reason ledger volume is tiny — handful of rows/day).
+
+**B. AI MCQ correctIndex was being lost** — Groq returns a correct answer per question, but in `create-assessment-form.tsx` the form was using `setValue()` which doesn't re-mount `useFieldArray` rows. Radio inputs stayed registered with their **original** `correctIndex=0`, so the auto-generated questions all looked like "answer is option A". Switched to `replace()` and made `defaultChecked` read from form state via `watch()`. Also coerce + clamp `correctIndex` server-side in case Groq returns it as a string or out of bounds.
+
+**C. Student chat duplicates** — students saw their own messages twice: once from the local pubsub publish (UUID id), once from the Firestore refetch (Firestore-generated id). Two-part fix:
+- Added `clientId` to the chat schema (`class-chat.service.ts`), the API route (`/api/classrooms/[id]/chat/route.ts`), and **both** pubsub publishers (student + teacher).
+- Both chat panes (`student-right-panel.tsx`, `copilot-panel.tsx`) now dedupe by `clientId`, with a `senderUid+text+timestamp` fingerprint fallback for legacy messages without one.
+- **Bonus:** teacher pane now also publishes JSON pubsub events on send (instead of relying on the 20s Firestore refetch), so students see teacher messages instantly.
+
+**D. Support form** — refactored to pass payload as the `mutate` argument (avoids any stale-closure risk on the input state), trimmed `subject` and `details` before validation, and added `console.error` logging on submit failure so the user can debug from devtools.
+
+**Net delta:** +179 / −63 across 7 source files (plus the screenshot).
+
+### 6.4 — `acf5ad7` Student camera toggle + Ask-teacher files a real question
+
+Two student-portal interaction gaps closed in one commit:
+
+**A. Camera toggle in student topbar.** `student-classroom-topbar.tsx` already had a mic button; added a matching **camera button** beside it. Both default off (the `videosdk-provider` already opts students out of webcam by default), so students explicitly opt-in. Browser native permission prompt fires on first toggle.
+
+**B. Ask-teacher button now files a real question.** Previously it just stuffed a placeholder into the chat input — useless. Now in `student-right-panel.tsx`:
+1. **Empty draft → "ask mode"**: input gets an amber focus ring + a hint, Enter submits the typed text as a question instead of a chat message.
+2. On submit:
+   - `POST /api/classrooms/[id]/questions` so it lands in the teacher's Questions tab.
+   - Publishes `NEW_QUESTION` pubsub so the teacher's Questions pane and AI Highlights strip refetch immediately (no 15s wait).
+   - Mirrors the question into chat with a `❓` prefix so peers see what was asked in conversation flow.
+
+**Net delta:** +105 / −11 across 2 files.
+
+### 6.5 — `3979d79` Teacher can remove students; students share notes without approval
+
+Two parallel features, both about lowering friction in the live class:
+
+**A. Teacher kick-from-call.**
+- New `POST /api/meetings/[id]/kick` (teacher-only) that adds the uid to a `bannedUids` array on the meeting doc.
+- The **token endpoint** (`/api/meetings/[id]/token`) now refuses tokens for banned uids — so even a refresh + rejoin attempt fails at the auth boundary, not just in-call.
+- `students-pane.tsx` (teacher) gets a per-row `UserMinus` button with a confirm prompt; clicking publishes `STUDENT_KICK` pubsub for instant signal.
+- Student page (`src/app/student/classroom/[meetingId]/page.tsx`) mounts a `KickReceiver` that watches `STUDENT_KICK`, routes the kicked student back to `/student` with a toast.
+- `meetings.service.ts` gains `kickStudent` / `unkickStudent` (admin can re-admit by passing `{ banned: false }` on the same endpoint — kept the API single).
+
+**B. Students share notes without teacher approval.**
+- `/api/classrooms/[id]/notes` POST no longer hard-requires teacher/admin role; **enrolled students can post too**. Server still verifies enrollment via `classroom.studentIds`.
+- `authorRole` field now includes `"student"`; `class-notes.service.ts` updated.
+- When the request includes `{ studentNoteId, meetingId }`, the server flips `shared=true` on the originating private note so the **Share button hides itself** in the student UI immediately.
+- `student-left-panel.tsx` mutation passes those ids and invalidates the private-notes query on success.
+
+**Net delta:** +222 / −14 across 9 files. New routes: `/api/meetings/[id]/kick` POST.
+
+### 6.6 — `dadfd85` Live captions + Groq translation overlay
+
+The big one for the day. Browser-based speech recognition + Groq translation, overlaid on top of the live video on **both** teacher and student sides.
+
+**New API:** `/api/ai/translate` (`src/app/api/ai/translate/route.ts`)
+- Accepts `{ text, sourceLang?, targetLang }`.
+- Asks Groq to translate one short caption at a time. Low temperature + a literal-translator system prompt so output stays close to source.
+- Skipped when source == target (returns the input as-is).
+
+**New component:** `src/components/shared/live-captions.tsx` (606 lines, single file)
+
+Per-tab behavior:
+- Each participant runs **Web Speech Recognition on their own mic** (continuous, interim results enabled).
+- Recognition only runs while the user's mic is on — muting also kills caption broadcast.
+- Publishes `LIVE_CAPTION` pubsub events with `{ uid, name, text, lang, final, ts }`. Interim results are throttled to ~4Hz; finals always publish.
+- Auto-restarts on silent timeout via `onend`; turns itself off if the user denies mic permission to avoid an error loop.
+
+Consumption:
+- Consumes incoming captions from **all participants**.
+- Interim updates **replace** the current uid's interim line; finals **append**.
+- Non-target-language finals are translated through `/api/ai/translate`, with a **per-tab cache** keyed by `(text, source, target)` so repeats are free.
+- Renders a fading caption strip (max 3 lines, 10s TTL) at the bottom of the host container.
+- A CC toggle + language popover floats top-right.
+- Persists prefs (`enabled`, `sourceLang`, `targetLang`) in `localStorage`.
+
+Browser support:
+- Falls back gracefully on Firefox / Safari (toggle disabled with a "needs Chrome or Edge" hint).
+
+Mounting points:
+- Teacher: inside the video-stage container in `main-area.tsx` (2 lines of glue).
+- Student: inside `.live-stage` in `student-main-area.tsx` (2 lines).
+
+**Net delta:** +681 / −0 across 4 files. New pubsub channel: `LIVE_CAPTION`.
+
+### Session 6 — pubsub channels added/changed
+
+| Channel | Direction | Added in | Notes |
+|---|---|---|---|
+| `REACTION` | student → teacher | 6.2 (existed earlier; payload extended) | now includes `{ state: "active" \| "cleared" }`, `persist:true` |
+| `STUDENT_KICK` | teacher → student | 6.5 | one-shot, gates on `uid` |
+| `NEW_QUESTION` | student → teacher | 6.4 | refetch hint for Questions pane + Highlights |
+| `LIVE_CAPTION` | bidirectional | 6.6 | high-frequency (interim) + low-frequency (final); both shapes share schema |
+
+### Session 6 — files added/touched (concise)
+
+**New files:**
+- `src/app/api/ai/translate/route.ts`
+- `src/app/api/meetings/[id]/kick/route.ts`
+- `src/components/shared/live-captions.tsx`
+
+**Touched (notable):**
+- `src/app/api/classrooms/[id]/chat/route.ts` (clientId)
+- `src/app/api/classrooms/[id]/notes/route.ts` (student authorship + private-note flip)
+- `src/app/api/meetings/[id]/token/route.ts` (banned uid rejection)
+- `src/app/student/(portal)/support/page.tsx` (form fix)
+- `src/app/student/classroom/[meetingId]/page.tsx` (KickReceiver mount)
+- `src/components/student/classroom/student-classroom-topbar.tsx` (camera toggle)
+- `src/components/student/classroom/student-left-panel.tsx` (note-share mutation)
+- `src/components/student/classroom/student-main-area.tsx` (audio mixer, screen share, captions, reaction state)
+- `src/components/student/classroom/student-right-panel.tsx` (chat dedupe, ask-teacher flow)
+- `src/components/teacher/classroom/ai-highlights-strip.tsx` (reaction chips)
+- `src/components/teacher/classroom/copilot-panel.tsx` (chat clientId + instant pubsub)
+- `src/components/teacher/classroom/main-area.tsx` (reaction aggregator, captions mount)
+- `src/components/teacher/classroom/students-pane.tsx` (kick button)
+- `src/components/teacher/classroom/video-stage.tsx` (ParticipantAudio)
+- `src/components/teacher/create-assessment-form.tsx` (MCQ correctIndex)
+- `src/server/services/brain-tokens.service.ts` (no-composite-index claim)
+- `src/server/services/class-chat.service.ts` (clientId field)
+- `src/server/services/class-notes.service.ts` (student authorRole)
+- `src/server/services/meetings.service.ts` (kickStudent/unkickStudent)
+
+### Session 6 — heads-up for next session
+
+1. **Live captions need real-world testing on multi-language calls.** Logic looks right in code review but recognition + translation latency is hard to predict without a real two-language pair. If captions feel laggy, the throttle in `live-captions.tsx` (~4Hz interim, finals always) is the first knob.
+2. **Banned uids are stored on the meeting doc**, not the classroom doc. So if a teacher kicks a student then ends the meeting and starts a new one for the same class, the ban does **not** carry over. Probably the right behavior — but if not, `meetings.service.ts` is where to add classroom-level banning.
+3. **Caption translation cache is per-tab in memory.** A long class with lots of repeat phrases will see free translations after the first occurrence, but reload = cache flush. If Groq cost becomes a concern, a Firestore-backed cache keyed on `(text, source, target)` is the obvious next step.
+4. **`NEW_QUESTION` pubsub is a refetch hint, not the question payload.** Teacher's Questions pane still goes to the API to get the row. This is intentional (single source of truth) — don't switch to publishing the question itself unless you also remove the Firestore round-trip.
+5. **Student note-share flips `shared=true` on the originating private note.** The student UI hides the Share button when `shared` is true. If a teacher later **deletes** the shared note, the original private note still has `shared=true` so the student can't re-share. Acceptable for now — fix is a soft delete + re-share path if it becomes a complaint.
+6. **Build status:** working tree clean. `npx tsc --noEmit` was not re-run this session (no new TS-only files except `live-captions.tsx`, which is internally typed). `next build` not re-run either.
 
 ---
 
@@ -1872,12 +2036,13 @@ old src/app/teacher/{dashboard,classes,profile,assessments}/  (moved into (porta
 2. Reference `_design/CVC-TP.html` for the **current** classroom UI (teacher panel, session 4). Reference `_design/teacher_portal_mockup.html` for older pages (dashboard/classes/reports).
 3. Reference `.claude/PROJECT_SETUP.md` for the full original architecture spec.
 4. **Teacher classroom is feature-complete end-to-end** as of session 4.4 — meeting (with self-view mirror), whiteboard (with board-surface color picker), screen share, slide present (local-only, images + PDF), per-slide pen annotations, laser pointer, rewards + leaderboard, mute-all/cam-off, live raised-hands count + lower-all, live Questions poll, student Q&A board (with AI-answer button), Firestore-backed notes, Firestore-backed chat, scientific calculator (synced), Class Comprehension modal, End summary with issues/impact, Co-pilot 4 tabs (Insights/Class chat/Trends/Ask AI). AI Highlights is live-driven. Remaining dummy: Breakout Rooms tab, agenda empty state.
-5. **Next natural chunks (priority order):**
-   - **Student-side live classroom** (`/student/classroom/[meetingId]`) — the most important missing piece. All teacher-side pubsub is ready to pair with it, including the 4.1-added `HAND_RAISE` / `LOWER_HANDS` channels. See Step 18 above for the exact channel list to subscribe/publish.
+5. **Next natural chunks (priority order, post-session-6):**
+   - **Real-world QA pass on captions/translation** — code is in, feels right, but two-language live testing is the missing validation. Knob is in `live-captions.tsx`.
    - **Admin portal** — especially for importing class notes, agenda, and eventually durable slide decks (slides API is already on disk from session 4, unused by the classroom UI since 4.2).
    - **Breakout Rooms backend** — currently static demo tab.
    - **End-of-class summary PDF export** — modal writes to `summaries/{meetingId}` already; add pdfkit builder and share button.
    - **Firestore mirror for live quiz (`QUIZ_Q`/`QUIZ_A`)** — currently pubsub-only, so meeting ends = poll results lost.
+   - **Persist caption translations cross-session** — currently per-tab in-memory cache; Firestore `translationCache/{hash}` would amortize Groq cost across calls.
 6. Dev server: `npm run dev`. Env vars needed: Firebase web + Admin, `FIREBASE_STORAGE_BUCKET` (or falls back to `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`), `VIDEOSDK_API_KEY` + `VIDEOSDK_SECRET_KEY`, `GROQ_API_KEY` (all already set in `.env`).
 7. **If you can't join a class** → restart the dev server after any `.env` change. Meetings created before keys were set will self-heal on first join via `ensureVideosdkRoom`.
 8. **Slide uploads no longer hit storage (since 4.2)** — teacher picks files, pdfjs splits PDF in-browser, slides become object URLs, everything cleared on unmount. If you're bringing back the admin-import flow, re-wire to the retained `/api/meetings/[id]/slides` routes and `slides.service.ts`.
@@ -1885,3 +2050,7 @@ old src/app/teacher/{dashboard,classes,profile,assessments}/  (moved into (porta
 10. **Pubsub channels reference** — see the Session 4 table above for the full list. When wiring the student classroom, pair each producer/consumer as listed.
 11. **If a user reports "I saved subjects but they don't stick"** → that's the 3.1 `/auth/session` fix. Make sure that route returns the full user doc.
 12. **If subject-match isn't finding a classroom** → check both sides. Classroom needs either `subjectName` (new) or `subjectId` that lowercases to match the student's subject string. Subjects collection is OPTIONAL — the 3-way match works without it.
+13. **Live captions (session 6.6) are browser-gated** — Web Speech Recognition only works in Chrome/Edge. The toggle is intentionally disabled on Firefox/Safari with a hint; don't try to "fix" that without a polyfill plan.
+14. **Banned uids on a meeting** (session 6.5) — kicks survive a browser refresh because the token endpoint rejects banned uids. They do NOT survive ending the meeting and starting a fresh one for the same class. Likely correct, but worth noting.
+15. **Chat dedupe key is `clientId`** (session 6.3). If you add a third sender path (e.g. system messages), give it a clientId or it'll appear duplicated when the Firestore refetch lands.
+16. **Audio is on `<audio>`, video tiles are video-muted** (session 6.1). If you ever attach `audio` directly to a video element, you'll get double-play. Prefer the `ParticipantAudio` / `RoomAudioMixer` pattern.
