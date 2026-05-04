@@ -4,12 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  BookOpen,
   Users,
   BarChart3,
-  FileText,
   GraduationCap,
-  FolderOpen,
   ClipboardList,
   User,
   Video,
@@ -35,12 +32,10 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: <User className="h-3.5 w-3.5" />, label: "Profile", href: "/student/profile" },
   ],
   admin: [
-    { icon: <LayoutDashboard className="h-3.5 w-3.5" />, label: "Dashboard", href: "/admin/users" },
+    { icon: <LayoutDashboard className="h-3.5 w-3.5" />, label: "Dashboard", href: "/admin/dashboard" },
     { icon: <Users className="h-3.5 w-3.5" />, label: "Users", href: "/admin/users" },
-    { icon: <GraduationCap className="h-3.5 w-3.5" />, label: "Subjects", href: "/admin/subjects" },
-    { icon: <FolderOpen className="h-3.5 w-3.5" />, label: "Agendas", href: "/admin/agendas" },
-    { icon: <FileText className="h-3.5 w-3.5" />, label: "Resources", href: "/admin/resources" },
-    { icon: <BarChart3 className="h-3.5 w-3.5" />, label: "Analytics", href: "/admin/analytics" },
+    { icon: <GraduationCap className="h-3.5 w-3.5" />, label: "Applications", href: "/admin/applications" },
+    { icon: <BarChart3 className="h-3.5 w-3.5" />, label: "Reports", href: "/admin/reports" },
   ],
 };
 

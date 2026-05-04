@@ -25,4 +25,25 @@ export const supportService = {
     await ref.set(payload);
     return { id: ref.id, ...payload };
   },
+
+  async listAll(status?: "open" | "resolved"): Promise<SupportTicket[]> {
+    let q: FirebaseFirestore.Query = adminDb.collection(
+      Collections.SUPPORT_TICKETS,
+    );
+    if (status) q = q.where("status", "==", status);
+    const snap = await q.get();
+    const tickets = snap.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as Omit<SupportTicket, "id">),
+    })) as SupportTicket[];
+    tickets.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return tickets;
+  },
+
+  async setStatus(id: string, status: "open" | "resolved") {
+    await adminDb.collection(Collections.SUPPORT_TICKETS).doc(id).update({
+      status,
+    });
+    return { id, status };
+  },
 };

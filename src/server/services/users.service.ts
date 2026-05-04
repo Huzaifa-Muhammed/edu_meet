@@ -3,6 +3,7 @@ import { adminDb } from "@/server/firebase-admin";
 import { Collections } from "@/shared/constants/collections";
 import { notFound } from "@/server/utils/errors";
 import type { UserUpdateInput } from "@/shared/schemas/user.schema";
+import type { User } from "@/shared/types/domain";
 
 export const usersService = {
   async getByUid(uid: string) {
@@ -44,5 +45,90 @@ export const usersService = {
         totalClassrooms: classroomsSnap.size,
       },
     };
+  },
+
+  async listByRole(role?: "teacher" | "student" | "admin" | "parent") {
+    let q: FirebaseFirestore.Query = adminDb.collection(Collections.USERS);
+    if (role) q = q.where("role", "==", role);
+    const snap = await q.get();
+    const users = snap.docs.map((d) => ({
+      uid: d.id,
+      ...(d.data() as Omit<User, "uid">),
+    })) as User[];
+    users.sort((a, b) =>
+      (a.displayName ?? "").localeCompare(b.displayName ?? ""),
+    );
+    return users;
+  },
+
+  async setBlocked(uid: string, blocked: boolean, reason?: string) {
+    const now = new Date().toISOString();
+    const update: Record<string, unknown> = {
+      blocked,
+      updatedAt: now,
+    };
+    if (blocked) {
+      update.blockedAt = now;
+      update.blockReason = reason ?? null;
+    } else {
+      update.blockedAt = null;
+      update.blockReason = null;
+    }
+    await adminDb.collection(Collections.USERS).doc(uid).update(update);
+    return { uid, blocked };
+  },
+
+  async getDetail(uid: string) {
+    const user = (await usersService.getByUid(uid)) as User;
+
+    if (user.role === "teacher") {
+      const meetingsSnap = await adminDb
+        .collection(Collections.MEETINGS)
+        .where("teacherId", "==", uid)
+        .get();
+      const classroomsSnap = await adminDb
+        .collection(Collections.CLASSROOMS)
+        .where("teacherId", "==", uid)
+        .get();
+      return {
+        ...user,
+        stats: {
+          totalClassrooms: classroomsSnap.size,
+          totalMeetings: meetingsSnap.size,
+        },
+      };
+    }
+
+    if (user.role === "student") {
+      const classroomsSnap = await adminDb
+        .collection(Collections.CLASSROOMS)
+        .where("studentIds", "array-contains", uid)
+        .get();
+
+      const submissionsSnap = await adminDb
+        .collection(Collections.ASSESSMENT_SUBMISSIONS)
+        .where("uid", "==", uid)
+        .get();
+
+      const tokenDoc = await adminDb
+        .collection(Collections.BRAIN_TOKENS)
+        .doc(uid)
+        .get();
+
+      const balance = tokenDoc.exists
+        ? ((tokenDoc.data() as { balance?: number }).balance ?? 0)
+        : 0;
+
+      return {
+        ...user,
+        stats: {
+          totalClassrooms: classroomsSnap.size,
+          totalSubmissions: submissionsSnap.size,
+          balance,
+        },
+      };
+    }
+
+    return { ...user, stats: {} };
   },
 };

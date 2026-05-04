@@ -2,8 +2,8 @@
 export const dynamic = "force-dynamic";
 
 import { useRoleGuard } from "@/hooks/use-role-guard";
-import { Topbar } from "@/components/layout/topbar";
-import { Sidenav } from "@/components/layout/sidenav";
+import { AdminSidenav } from "@/components/admin/admin-sidenav";
+import { AdminTopbar } from "@/components/admin/admin-topbar";
 
 export default function AdminLayout({
   children,
@@ -14,7 +14,7 @@ export default function AdminLayout({
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-bg">
+      <div className="admin-ui flex h-screen items-center justify-center bg-bg">
         <div className="text-sm text-t3">Loading...</div>
       </div>
     );
@@ -23,11 +23,13 @@ export default function AdminLayout({
   if (!authorized) return null;
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
-      <Topbar />
+    <div className="admin-ui flex h-screen flex-col overflow-hidden bg-bg">
       <div className="flex flex-1 overflow-hidden">
-        <Sidenav role="admin" />
-        <div className="flex flex-1 flex-col overflow-hidden">{children}</div>
+        <AdminSidenav />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <AdminTopbar />
+          <main className="flex-1 overflow-y-auto">{children}</main>
+        </div>
       </div>
     </div>
   );

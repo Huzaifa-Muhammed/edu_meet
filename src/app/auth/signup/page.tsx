@@ -42,7 +42,11 @@ export default function SignupPage() {
     try {
       await signUp(data.email, data.password, data.displayName, data.role);
       toast.success("Account created!");
-      router.push(`/${data.role}/dashboard`);
+      if (data.role === "teacher") {
+        router.push("/teacher/apply");
+      } else {
+        router.push(`/${data.role}/dashboard`);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Signup failed");
     } finally {

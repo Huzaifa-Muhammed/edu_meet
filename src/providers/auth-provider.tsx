@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
@@ -17,18 +18,30 @@ interface AuthCtx {
   firebaseUser: FirebaseUser | null;
   user: User | null;
   loading: boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthCtx>({
   firebaseUser: null,
   user: null,
   loading: true,
+  refreshUser: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const fetchProfile = useCallback(async (fbUser: FirebaseUser) => {
+    const pendingRole = readPendingRole();
+    const profile = await api.post("/auth/session", {
+      idToken: await fbUser.getIdToken(),
+      ...(pendingRole ? { role: pendingRole } : {}),
+    });
+    clearPendingRole();
+    return profile as unknown as User;
+  }, []);
 
   useEffect(() => {
     const firebaseAuth = getFirebaseAuth();
@@ -38,13 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (fbUser) {
         try {
-          const pendingRole = readPendingRole();
-          const profile = await api.post("/auth/session", {
-            idToken: await fbUser.getIdToken(),
-            ...(pendingRole ? { role: pendingRole } : {}),
-          });
-          clearPendingRole();
-          setUser(profile as unknown as User);
+          setUser(await fetchProfile(fbUser));
         } catch {
           setUser(null);
         }
@@ -57,10 +64,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return unsubscribe;
-  }, []);
+  }, [fetchProfile]);
+
+  const refreshUser = useCallback(async () => {
+    const fbUser = getFirebaseAuth().currentUser;
+    if (!fbUser) return;
+    try {
+      setUser(await fetchProfile(fbUser));
+    } catch {
+      // leave user as-is on transient failure
+    }
+  }, [fetchProfile]);
 
   return (
-    <AuthContext value={{ firebaseUser, user, loading }}>
+    <AuthContext value={{ firebaseUser, user, loading, refreshUser }}>
       {children}
     </AuthContext>
   );

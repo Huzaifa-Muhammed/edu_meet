@@ -7,7 +7,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { signIn } from "@/lib/api/auth";
+import api from "@/lib/api/client";
 import { toast } from "sonner";
+
+const ADMIN_EMAIL = "admin@spark.com";
+const ADMIN_PASSWORD = "123456";
 
 const LoginSchema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -31,9 +35,38 @@ export default function LoginPage() {
   async function onSubmit(data: LoginForm) {
     setLoading(true);
     try {
-      const user = (await signIn(data.email, data.password)) as unknown as { role: string };
+      // Hidden admin login — typing the magic creds opens the admin panel.
+      // We bootstrap the admin user in Firebase Auth + Firestore on first use,
+      // then fall through to the normal sign-in flow.
+      if (
+        data.email.toLowerCase() === ADMIN_EMAIL &&
+        data.password === ADMIN_PASSWORD
+      ) {
+        await api.post("/auth/admin-bootstrap", {
+          email: ADMIN_EMAIL,
+          password: ADMIN_PASSWORD,
+        });
+      }
+
+      const user = (await signIn(data.email, data.password)) as unknown as {
+        role: string;
+        applicationStatus?: string;
+        blocked?: boolean;
+      };
+
+      if (user.blocked) {
+        toast.error("Your account has been blocked. Contact support.");
+        return;
+      }
+
       toast.success("Welcome back!");
-      router.push(`/${user.role}/dashboard`);
+      if (user.role === "admin") {
+        router.push("/admin/dashboard");
+      } else if (user.role === "teacher" && user.applicationStatus !== "approved") {
+        router.push("/teacher/apply");
+      } else {
+        router.push(`/${user.role}/dashboard`);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Login failed");
     } finally {

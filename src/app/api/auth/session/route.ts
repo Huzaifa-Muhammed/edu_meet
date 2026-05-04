@@ -5,6 +5,7 @@ import { adminAuth, adminDb } from "@/server/firebase-admin";
 import { Collections } from "@/shared/constants/collections";
 import { SessionRequestSchema } from "@/shared/schemas/auth.schema";
 import { ok, fail } from "@/server/utils/response";
+import { forbidden } from "@/server/utils/errors";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,11 +16,15 @@ export async function POST(req: NextRequest) {
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
+      const role = body.role ?? "student";
       const newUser = {
         email: decoded.email ?? "",
         displayName: decoded.name ?? decoded.email?.split("@")[0] ?? "",
         photoUrl: decoded.picture ?? null,
-        role: body.role ?? "student",
+        role,
+        // Teachers must complete the application before accessing the portal.
+        applicationStatus: role === "teacher" ? "none" : "approved",
+        blocked: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -28,6 +33,11 @@ export async function POST(req: NextRequest) {
     }
 
     const data = userDoc.data()!;
+
+    if (data.blocked) {
+      throw forbidden("Your account has been blocked. Contact support.");
+    }
+
     // Return the full user doc so the client sees subjects, bio, etc.
     return ok({
       uid: decoded.uid,

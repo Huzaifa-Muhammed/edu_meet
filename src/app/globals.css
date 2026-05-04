@@ -1587,3 +1587,58 @@ html, body {
   --bbg: rgba(34, 197, 94, 0.12);
   --bbd: rgba(34, 197, 94, 0.3);
 }
+
+/* ── Admin portal — slate base + sky-blue accent ──
+   Mirrors the dark-overlay pattern of .student-ui but with a slate
+   background and a cool sky-blue accent so admins feel like they're
+   in a distinct, more authoritative space. */
+.admin-ui {
+  --bg: #0B1220;
+  --surf: rgba(255, 255, 255, 0.04);
+  --panel: rgba(255, 255, 255, 0.03);
+  --panel2: rgba(255, 255, 255, 0.07);
+
+  --bd: rgba(255, 255, 255, 0.07);
+  --bd2: rgba(255, 255, 255, 0.12);
+
+  --t: #FFFFFF;
+  --t2: rgba(255, 255, 255, 0.7);
+  --t3: rgba(255, 255, 255, 0.4);
+
+  /* Sky-blue accent */
+  --acc: #38BDF8;
+  --accbg: rgba(56, 189, 248, 0.12);
+
+  --side: #060B17;
+  --sidebd: rgba(255, 255, 255, 0.06);
+  --cp: #060B17;
+  --cpbd: rgba(255, 255, 255, 0.06);
+
+  --gbg: rgba(74, 222, 128, 0.12);
+  --gbd: rgba(74, 222, 128, 0.3);
+  --gt: #4ADE80;
+  --green: #4ADE80;
+
+  --bbg: rgba(56, 189, 248, 0.12);
+  --bbd: rgba(56, 189, 248, 0.3);
+  --bt: #7DD3FC;
+  --blue: #38BDF8;
+
+  --abg: rgba(245, 158, 11, 0.12);
+  --abd: rgba(245, 158, 11, 0.3);
+  --at: #F59E0B;
+  --amber: #F59E0B;
+
+  --pbg: rgba(168, 85, 247, 0.12);
+  --pbd: rgba(168, 85, 247, 0.3);
+  --pt: #C4B5FD;
+  --purple: #A855F7;
+
+  --rbg: rgba(239, 68, 68, 0.12);
+  --rbd: rgba(239, 68, 68, 0.3);
+  --rt: #F87171;
+  --red: #EF4444;
+
+  --topbar: #0B1220;
+  --sidenav: #060B17;
+}

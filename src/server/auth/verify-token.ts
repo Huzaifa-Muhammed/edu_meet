@@ -29,6 +29,9 @@ export async function verifyToken(req: NextRequest): Promise<AuthUser> {
     }
 
     const data = userDoc.data()!;
+    if (data.blocked) {
+      throw unauthorized("Account is blocked");
+    }
     return {
       uid: decoded.uid,
       email: decoded.email ?? data.email,

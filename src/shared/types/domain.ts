@@ -22,8 +22,29 @@ export interface User {
   bio?: string;
   subjects?: string[];
   linkedStudents?: string[];
+  blocked?: boolean;
+  blockedAt?: string;
+  blockReason?: string;
+  applicationStatus?: "none" | "pending" | "approved" | "rejected";
   createdAt: string;
   updatedAt: string;
+}
+
+/* ── Teacher applications ── */
+export interface TeacherApplication {
+  id: string;
+  uid: string;
+  email: string;
+  displayName: string;
+  subject: string;
+  yearsExperience: number;
+  highestDegree: string;
+  bio?: string;
+  status: "pending" | "approved" | "rejected";
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewNote?: string;
 }
 
 /* ── Subjects ── */
