@@ -2,6 +2,9 @@ import "server-only";
 import { adminDb } from "@/server/firebase-admin";
 import { Collections } from "@/shared/constants/collections";
 import { notFound } from "@/server/utils/errors";
+import { sendEmail } from "@/server/providers/email";
+import { UserBlockedEmail } from "@/server/email/templates/user-blocked";
+import { UserUnblockedEmail } from "@/server/email/templates/user-unblocked";
 import type { UserUpdateInput } from "@/shared/schemas/user.schema";
 import type { User } from "@/shared/types/domain";
 
@@ -75,6 +78,43 @@ export const usersService = {
       update.blockReason = null;
     }
     await adminDb.collection(Collections.USERS).doc(uid).update(update);
+
+    // Fire-and-forget email notice. Pull name + email off the doc.
+    try {
+      const fresh = await adminDb.collection(Collections.USERS).doc(uid).get();
+      const data = fresh.data() as User | undefined;
+      if (data?.email) {
+        const base =
+          process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000";
+        const supportEmail = process.env.EMAIL_REPLY_TO?.trim();
+        if (blocked) {
+          sendEmail({
+            to: data.email,
+            subject: "Your EduMeet account has been suspended",
+            templateKey: "user-blocked",
+            react: UserBlockedEmail({
+              name: data.displayName ?? "",
+              reason,
+              supportEmail:
+                supportEmail && supportEmail.length > 0 ? supportEmail : undefined,
+            }),
+          }).catch((err) => console.error("[email]", err));
+        } else {
+          sendEmail({
+            to: data.email,
+            subject: "Your EduMeet account has been reinstated",
+            templateKey: "user-unblocked",
+            react: UserUnblockedEmail({
+              name: data.displayName ?? "",
+              loginUrl: `${base}/auth/login`,
+            }),
+          }).catch((err) => console.error("[email]", err));
+        }
+      }
+    } catch (err) {
+      console.warn("[email] failed to dispatch block notice", err);
+    }
+
     return { uid, blocked };
   },
 

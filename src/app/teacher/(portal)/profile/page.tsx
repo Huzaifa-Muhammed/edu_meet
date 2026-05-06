@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api/client";
 import { ProfileForm } from "@/components/teacher/profile-form";
 import { SubjectPicker } from "@/components/shared/subject-picker";
+import { TeacherCredentials } from "@/components/shared/teacher-credentials";
+import { ChangePasswordForm } from "@/components/shared/change-password-form";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { signOut } from "firebase/auth";
@@ -83,6 +85,34 @@ export default function TeacherProfilePage() {
             invalidateUserQuery
           />
         </div>
+
+        <div className="rounded-xl border border-bd bg-surf p-6">
+          <h2 className="mb-1 text-sm font-semibold text-t">Security</h2>
+          <p className="mb-4 text-xs text-t3">
+            Change your account password. You&apos;ll need your current password
+            to confirm.
+          </p>
+          <ChangePasswordForm />
+        </div>
+
+        {!!(
+          user?.experiences?.length ||
+          user?.certifications?.length ||
+          user?.degrees?.length
+        ) && (
+          <div className="rounded-xl border border-bd bg-surf p-6">
+            <h2 className="mb-1 text-sm font-semibold text-t">Credentials</h2>
+            <p className="mb-4 text-xs text-t3">
+              Approved by admin from your application. Click an image to view it
+              full size.
+            </p>
+            <TeacherCredentials
+              experiences={user?.experiences}
+              certifications={user?.certifications}
+              degrees={user?.degrees}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

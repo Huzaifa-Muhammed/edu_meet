@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Check, X, Clock, GraduationCap } from "lucide-react";
 import api from "@/lib/api/client";
+import { TeacherCredentials } from "@/components/shared/teacher-credentials";
 import type { TeacherApplication } from "@/shared/types/domain";
 
 type Filter = "pending" | "approved" | "rejected" | "all";
@@ -185,6 +186,15 @@ function ApplicationCard({
           <p className="mt-1 whitespace-pre-wrap text-xs text-t2">{app.bio}</p>
         </div>
       )}
+
+      <div className="mt-3">
+        <TeacherCredentials
+          experiences={app.experiences}
+          certifications={app.certifications}
+          degrees={app.degrees}
+          compact
+        />
+      </div>
 
       {app.reviewNote && app.status === "rejected" && (
         <div className="mt-3 rounded-lg border border-rbd bg-rbg p-3">

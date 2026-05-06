@@ -13,6 +13,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 import api from "@/lib/api/client";
+import { TeacherCredentials } from "@/components/shared/teacher-credentials";
 import type { User } from "@/shared/types/domain";
 
 type DetailResponse = User & {
@@ -37,8 +38,17 @@ export default function AdminUserDetailPage() {
   });
 
   const blockMutation = useMutation({
-    mutationFn: ({ blocked }: { blocked: boolean }) =>
-      api.post(`/admin/users/${uid}/block`, { blocked }) as Promise<unknown>,
+    mutationFn: ({
+      blocked,
+      reason,
+    }: {
+      blocked: boolean;
+      reason?: string;
+    }) =>
+      api.post(`/admin/users/${uid}/block`, {
+        blocked,
+        reason,
+      }) as Promise<unknown>,
     onSuccess: (_d, vars) => {
       toast.success(vars.blocked ? "User blocked" : "User unblocked");
       queryClient.invalidateQueries({ queryKey: ["admin", "user", uid] });
@@ -47,6 +57,24 @@ export default function AdminUserDetailPage() {
     },
     onError: (err: Error) => toast.error(err.message),
   });
+
+  function handleBlockToggle() {
+    if (!u) return;
+    if (u.blocked) {
+      blockMutation.mutate({ blocked: false });
+      return;
+    }
+    const input = window.prompt(
+      `Block ${u.displayName || u.email}?\n\nOptional reason — included in the email sent to this user. Leave blank to send a generic notice.`,
+      "",
+    );
+    if (input === null) return;
+    const reason = input.trim();
+    blockMutation.mutate({
+      blocked: true,
+      reason: reason.length > 0 ? reason : undefined,
+    });
+  }
 
   const u = userQ.data;
   const initials =
@@ -107,9 +135,7 @@ export default function AdminUserDetailPage() {
                 </div>
 
                 <button
-                  onClick={() =>
-                    blockMutation.mutate({ blocked: !u.blocked })
-                  }
+                  onClick={handleBlockToggle}
                   disabled={blockMutation.isPending}
                   className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 ${
                     u.blocked
@@ -191,6 +217,24 @@ export default function AdminUserDetailPage() {
                 )}
               </div>
             )}
+
+            {u.role === "teacher" &&
+              !!(
+                u.experiences?.length ||
+                u.certifications?.length ||
+                u.degrees?.length
+              ) && (
+                <div className="rounded-2xl border border-bd bg-surf p-6">
+                  <h2 className="mb-3 text-sm font-semibold text-t">
+                    Credentials
+                  </h2>
+                  <TeacherCredentials
+                    experiences={u.experiences}
+                    certifications={u.certifications}
+                    degrees={u.degrees}
+                  />
+                </div>
+              )}
 
             {u.role === "teacher" && u.applicationStatus !== "approved" && (
               <Link

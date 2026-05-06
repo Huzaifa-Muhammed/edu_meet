@@ -30,8 +30,19 @@ export default function AdminUsersPage() {
   });
 
   const blockMutation = useMutation({
-    mutationFn: ({ uid, blocked }: { uid: string; blocked: boolean }) =>
-      api.post(`/admin/users/${uid}/block`, { blocked }) as Promise<unknown>,
+    mutationFn: ({
+      uid,
+      blocked,
+      reason,
+    }: {
+      uid: string;
+      blocked: boolean;
+      reason?: string;
+    }) =>
+      api.post(`/admin/users/${uid}/block`, {
+        blocked,
+        reason,
+      }) as Promise<unknown>,
     onSuccess: (_data, vars) => {
       toast.success(vars.blocked ? "User blocked" : "User unblocked");
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
@@ -39,6 +50,24 @@ export default function AdminUsersPage() {
     },
     onError: (err: Error) => toast.error(err.message),
   });
+
+  function handleBlockToggle(u: User) {
+    if (u.blocked) {
+      blockMutation.mutate({ uid: u.uid, blocked: false });
+      return;
+    }
+    const input = window.prompt(
+      `Block ${u.displayName || u.email}?\n\nOptional reason — included in the email sent to this user. Leave blank to send a generic notice.`,
+      "",
+    );
+    if (input === null) return; // cancel
+    const reason = input.trim();
+    blockMutation.mutate({
+      uid: u.uid,
+      blocked: true,
+      reason: reason.length > 0 ? reason : undefined,
+    });
+  }
 
   const filtered = useMemo(() => {
     let list = usersQ.data ?? [];
@@ -110,12 +139,7 @@ export default function AdminUsersPage() {
               <UserRow
                 key={u.uid}
                 user={u}
-                onBlockToggle={() =>
-                  blockMutation.mutate({
-                    uid: u.uid,
-                    blocked: !u.blocked,
-                  })
-                }
+                onBlockToggle={() => handleBlockToggle(u)}
                 pending={blockMutation.isPending}
               />
             ))}

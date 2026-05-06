@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import api from "@/lib/api/client";
 import { SubjectPicker } from "@/components/shared/subject-picker";
+import { ChangePasswordForm } from "@/components/shared/change-password-form";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { signOut } from "firebase/auth";
@@ -203,6 +204,16 @@ export default function StudentProfilePage() {
             }}
             invalidateUserQuery
           />
+        </div>
+
+        {/* Security */}
+        <div className="rounded-xl border border-bd bg-surf p-6">
+          <h2 className="mb-1 text-sm font-semibold text-t">Security</h2>
+          <p className="mb-4 text-xs text-t3">
+            Change your account password. You&apos;ll need your current password
+            to confirm.
+          </p>
+          <ChangePasswordForm />
         </div>
 
         {/* Enrolled classes quick view */}

@@ -2,11 +2,18 @@ import "server-only";
 import { adminDb } from "@/server/firebase-admin";
 import { Collections } from "@/shared/constants/collections";
 import { notFound } from "@/server/utils/errors";
+import { sendEmail } from "@/server/providers/email";
+import { TeacherApprovedEmail } from "@/server/email/templates/teacher-approved";
+import { TeacherRejectedEmail } from "@/server/email/templates/teacher-rejected";
 import type { TeacherApplication } from "@/shared/types/domain";
 import type {
   TeacherApplicationCreateInput,
   TeacherApplicationReviewInput,
 } from "@/shared/schemas/teacher-application.schema";
+
+function appBaseUrl() {
+  return process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000";
+}
 
 const col = () => adminDb.collection(Collections.TEACHER_APPLICATIONS);
 
@@ -42,6 +49,9 @@ export const teacherApplicationsService = {
       email,
       displayName,
       ...input,
+      experiences: input.experiences ?? [],
+      certifications: input.certifications ?? [],
+      degrees: input.degrees ?? [],
       status: "pending" as const,
       submittedAt: new Date().toISOString(),
       reviewedAt: null,
@@ -84,13 +94,48 @@ export const teacherApplicationsService = {
       reviewNote: input.reviewNote ?? null,
     });
 
-    await adminDb.collection(Collections.USERS).doc(app.uid).set(
-      {
-        applicationStatus: input.status,
-        updatedAt: reviewedAt,
-      },
-      { merge: true },
-    );
+    const userPatch: Record<string, unknown> = {
+      applicationStatus: input.status,
+      updatedAt: reviewedAt,
+    };
+    if (input.status === "approved") {
+      userPatch.experiences = app.experiences ?? [];
+      userPatch.certifications = app.certifications ?? [];
+      userPatch.degrees = app.degrees ?? [];
+      if (app.bio && !("bio" in userPatch)) userPatch.bio = app.bio;
+    }
+
+    await adminDb
+      .collection(Collections.USERS)
+      .doc(app.uid)
+      .set(userPatch, { merge: true });
+
+    // Fire-and-forget transactional email. Errors are swallowed by sendEmail.
+    const base = appBaseUrl();
+    if (input.status === "approved") {
+      sendEmail({
+        to: app.email,
+        subject: "Your EduMeet teacher application is approved",
+        templateKey: "teacher-approved",
+        react: TeacherApprovedEmail({
+          name: app.displayName,
+          loginUrl: `${base}/teacher/dashboard`,
+          customMessage: input.reviewNote,
+        }),
+      }).catch((err) => console.error("[email]", err));
+    } else if (input.status === "rejected") {
+      sendEmail({
+        to: app.email,
+        subject: "Update on your EduMeet teacher application",
+        templateKey: "teacher-rejected",
+        react: TeacherRejectedEmail({
+          name: app.displayName,
+          reapplyUrl: `${base}/teacher/apply`,
+          reviewNote: input.reviewNote,
+        }),
+      }).catch((err) => console.error("[email]", err));
+    }
+
     return { id, status: input.status, reviewedAt };
   },
 };

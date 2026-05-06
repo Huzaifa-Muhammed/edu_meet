@@ -35,4 +35,5 @@ export const Collections = {
   REACTIONS: "reactions",
   REJOIN_REQUESTS: "rejoinRequests",
   TEACHER_APPLICATIONS: "teacherApplications",
+  EMAIL_LOG: "emailLog",
 } as const;

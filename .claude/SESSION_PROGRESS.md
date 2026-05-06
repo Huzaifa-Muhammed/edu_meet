@@ -4,7 +4,184 @@
 
 ---
 
-## Last Updated: 2026-04-28 (session 6 — student⇄teacher A/V fixes + reactions surfaced + bug bash + ask-teacher + remove students + student note-share + live captions/translate)
+## Last Updated: 2026-05-05 (session 7 — teacher application credentials w/ Cloudinary uploads + forgot/change password + transactional email via Resend)
+
+---
+
+## Session 7 (2026-05-05) — Cloudinary credentials, forgot/update password, Resend transactional email
+
+Three discrete features, no commits at session end (working tree dirty — verify with `git status`). `npx tsc --noEmit` → 0 errors after each block.
+
+### 7.1 — Teacher credentials uploads + display
+
+**Goal.** Extend the `/teacher/apply` flow so teachers can attach **experience**, **certification**, and **degree** entries with photo evidence. Show those entries to admins on the application card + user-detail page, and to teachers on their own profile.
+
+**Cloudinary integration.**
+- `src/server/providers/cloudinary.ts` — lazy-configured `cloudinary` SDK. Two helpers: `uploadImageBuffer(buffer, { folder, filename })` returns `{ url, publicId, width, height, bytes, format }`; `destroyImage(publicId)` for future cleanup. Stream-based `upload_stream`, no temp files.
+- `src/app/api/uploads/teacher-credentials/route.ts` — `POST` multipart, teacher-only (`requireRole(["teacher"])`). 8MB cap, allowlist: PNG/JPG/WebP/GIF. Folder: `edumeet/teacher-credentials/{uid}/`. Returns the upload result; client only needs `{ url, publicId }`.
+- Cloudinary creds already in `.env`: `CLOUDINARY_CLOUD_NAME=dddikocd6`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`. `cloudinary` package was already in `package.json` from a prior session.
+- `next.config.ts` — added `images.remotePatterns: [{ protocol: "https", hostname: "res.cloudinary.com" }]` so `next/image` can render Cloudinary URLs without `unoptimized`.
+
+**Schema + types.**
+- `src/shared/schemas/teacher-application.schema.ts` rewritten. Added `TeacherExperienceSchema` (title, organization, optional years, optional description, optional image), `TeacherCertificationSchema` (title, issuer, year, image), `TeacherDegreeSchema` (title, institution, year, image). All three plug into `TeacherApplicationCreateSchema` as `.array().max(20).optional()`. Image shape is `{ url: z.string().url(), publicId: z.string().min(1) }`.
+- `src/shared/types/domain.ts` — added `CredentialImage`, `TeacherExperienceEntry`, `TeacherCertificationEntry`, `TeacherDegreeEntry`. Both `User` and `TeacherApplication` now carry `experiences?`, `certifications?`, `degrees?`.
+
+**Service mirror on approve.**
+- `src/server/services/teacher-applications.service.ts` — `submit()` defaults the three arrays to `[]` if absent so reads are safe. `review()` now: when `status: "approved"`, copies `experiences/certifications/degrees` (and `bio` if not already set) onto `users/{uid}` so the teacher profile + admin user-detail can read from the user doc without re-fetching the application. Rejected/pending teachers don't get the user-doc mirror.
+
+**Apply page UX (`src/app/teacher/apply/page.tsx`).**
+- Three section cards (Experience / Certifications / Degrees) below the existing 4 fields. Each section is `useFieldArray` with `append`/`remove`. Per-row text inputs use `register("experiences.{i}.title")` etc. so values flow through RHF.
+- **`ImagePicker` reads via `useWatch`, writes via `setValue`** — NOT via `useFieldArray.update`. Reason: `update(i, value)` replaces the whole entry from a render-time snapshot of `fields[i]`, which can clobber text the user just typed. `setValue("experiences.{i}.image", img, { shouldDirty: true })` only touches the image field. Pattern to reuse if more uploaders land.
+- Upload runs immediately on file pick (fetch with manual `Authorization: Bearer ${idToken}` because axios+multipart is awkward). Dashed dropzone swaps for a 64×64 thumbnail with **Replace** / **Remove** buttons.
+- `onInvalid` handler on `handleSubmit` shows a toast — without it, RHF silently rejects partial credential rows since per-row errors aren't rendered.
+- Summary view (rendered when status is `pending` or `approved`) lists each credential with thumbnail + "View full image" link. No edit on summary; only the form (rejected / none) lets you re-enter.
+
+**Display component.**
+- `src/components/shared/teacher-credentials.tsx` — read-only gallery with `compact` prop for tight admin cards. Click thumbnail → fullscreen `Lightbox` (Esc closes, click outside closes, click image keeps open). Used in three places:
+  - `src/app/admin/applications/page.tsx` — card-level, `compact`
+  - `src/app/admin/users/[uid]/page.tsx` — Credentials card on teacher detail (only renders if any of the three arrays is non-empty)
+  - `src/app/teacher/(portal)/profile/page.tsx` — teacher's own profile, non-compact
+- Lightbox uses `<Image unoptimized />` for the full image so 5MB diplomas render at native size without Next's optimizer.
+
+**Files added/touched (7.1):**
+```
+src/server/providers/cloudinary.ts                              [new]
+src/app/api/uploads/teacher-credentials/route.ts                [new]
+src/components/shared/teacher-credentials.tsx                   [new]
+src/shared/schemas/teacher-application.schema.ts                [rewritten]
+src/shared/types/domain.ts                                      [+ credential types on User + Application]
+src/server/services/teacher-applications.service.ts             [submit defaults arrays; review mirrors on approve]
+src/app/teacher/apply/page.tsx                                  [rewritten — credential sections + ImagePicker]
+src/app/admin/applications/page.tsx                             [renders TeacherCredentials compact]
+src/app/admin/users/[uid]/page.tsx                              [Credentials card]
+src/app/teacher/(portal)/profile/page.tsx                       [Credentials card]
+next.config.ts                                                  [+ res.cloudinary.com remotePattern]
+```
+
+### 7.2 — Forgot password + change password
+
+**Login page (`src/app/auth/login/page.tsx`).**
+- Added "Forgot password?" link to the right of the Password label, routing to `/auth/forgot`.
+
+**Forgot page (`src/app/auth/forgot/page.tsx` — new).**
+- Email input → Firebase `sendPasswordResetEmail`.
+- **Hardcoded short-circuit for `admin@spark.com`** — shows an amber banner ("For security, the admin password can't be reset by email. Please contact website support…") instead of calling Firebase. Matches the same hardcoded-creds convention used by `/api/auth/admin-bootstrap`.
+- For unknown accounts, mirrors Firebase's enumeration-resistance: `auth/user-not-found` is treated as soft-success (same banner: "If an account exists for X, a reset link is on its way").
+- Success state shows the email that was used so the user can confirm typo-free.
+
+**ChangePasswordForm (`src/components/shared/change-password-form.tsx` — new, reusable).**
+- Three fields: current / new / confirm. Show/hide toggle for all three at once.
+- Zod rules: `newPassword.min(8)`, `currentPassword !== newPassword`, `confirm === newPassword`.
+- Re-auth via `EmailAuthProvider.credential(email, currentPassword)` → `reauthenticateWithCredential` → `updatePassword`. Reuses the already-signed-in `auth.currentUser` — no re-login flow.
+- `FRIENDLY` map turns Firebase codes (`auth/wrong-password`, `auth/invalid-credential`, `auth/too-many-requests`, `auth/weak-password`, `auth/requires-recent-login`) into user-readable toasts.
+
+**Profile pages.**
+- `src/app/teacher/(portal)/profile/page.tsx` — new "Security" card with `<ChangePasswordForm />`, placed above Credentials.
+- `src/app/student/(portal)/profile/page.tsx` — same Security card, placed above the My-classes list.
+- Admin password is intentionally not changeable in-app (bootstrap convention; forgot-password page directs them to support).
+
+**Files added/touched (7.2):**
+```
+src/app/auth/forgot/page.tsx                                    [new]
+src/components/shared/change-password-form.tsx                  [new]
+src/app/auth/login/page.tsx                                     [+ forgot link]
+src/app/teacher/(portal)/profile/page.tsx                       [+ Security card]
+src/app/student/(portal)/profile/page.tsx                       [+ Security card]
+```
+
+### 7.3 — Transactional email via Resend
+
+**Provider choice.** Resend SDK + `@react-email/components` for templates. Free tier (3k/month) covers volume; React templates fit the stack; one env key. Alternatives ruled out: Postmark (good but no DX win), Firebase Trigger Email extension (indirect, still needs a backing provider), Nodemailer+Gmail (deliverability bad).
+
+**Domain status.** Domain NOT verified yet. While unverified, Resend sends from `onboarding@resend.dev` and **delivers only to the email of the Resend account owner** — anything else 403s or is silently dropped. The `emailLog` collection captures these failures so they're debuggable.
+
+**Provider (`src/server/providers/email.ts` — new).**
+- One function: `sendEmail({ to, subject, react, templateKey, replyTo? })`. Returns `{ ok: true, id, transport } | { ok: false, error }`. **Never throws** — callers `.catch()` for safety but the inner code already swallows.
+- Honors `EMAIL_TRANSPORT`:
+  - `console` → renders the template (HTML + plaintext) and `console.info`s the plaintext. Audit log row written. No API call. Default when `NODE_ENV !== "production"` if env var unset.
+  - `resend` → real send.
+- Reads `EMAIL_FROM`, falls back to `"EduMeet <onboarding@resend.dev>"`. Reads `EMAIL_REPLY_TO` (optional, only set if non-empty).
+- Resend SDK is **lazy-instantiated** — `getClient()` reads `RESEND_API_KEY` on first call, so `.env` edits apply without a process restart (matches VideoSDK + Cloudinary patterns).
+- Audit log: every send (success or fail, console or resend) writes `{ to, subject, templateKey, transport, status, providerId?, error?, sentAt }` to `emailLog` Firestore collection.
+
+**Templates (`src/server/email/templates/*` — new).**
+- `_layout.tsx` — shared `EmailLayout` (centered card on `#F4F6FA`, brand header, footer copy) using `@react-email/components` primitives (`Html/Head/Body/Container/Section/Heading/Text/Button/Preview`). Exported `styles` object so per-template files stay terse.
+- `teacher-approved.tsx` — `{ name, loginUrl, customMessage? }`. Optional admin note rendered in callout block.
+- `teacher-rejected.tsx` — `{ name, reapplyUrl, reviewNote? }`. The `reviewNote` from the existing reject UI flows in here.
+- `user-blocked.tsx` — `{ name, reason?, supportEmail? }`.
+- `user-unblocked.tsx` — `{ name, loginUrl }`.
+- All four take a `name` and split on space for first-name greeting (`"Sarah Smith"` → "Hi Sarah,").
+
+**Trigger sites (existing services, not new endpoints).**
+- `src/server/services/teacher-applications.service.ts` — after the Firestore write in `review()`:
+  - `status === "approved"` → `TeacherApprovedEmail({ name, loginUrl: "${APP_URL}/teacher/dashboard", customMessage: input.reviewNote })`
+  - `status === "rejected"` → `TeacherRejectedEmail({ name, reapplyUrl: "${APP_URL}/teacher/apply", reviewNote: input.reviewNote })`
+  - Both wrapped in `.catch(err => console.error("[email]", err))`. App URL pulled from `NEXT_PUBLIC_APP_URL` (falls back to `http://localhost:3000`).
+- `src/server/services/users.service.ts` — after `setBlocked()` writes:
+  - Re-reads the user doc to get fresh `email`/`displayName` (could've been updated).
+  - `blocked: true` → `UserBlockedEmail({ name, reason, supportEmail: process.env.EMAIL_REPLY_TO })`
+  - `blocked: false` → `UserUnblockedEmail({ name, loginUrl: "${APP_URL}/auth/login" })`
+  - Email failure does NOT block the API response — wrapped in try/catch, logged.
+
+**Block reason capture (admin UI).**
+- Block button on `/admin/users` and `/admin/users/[uid]` now opens `window.prompt()` for an optional reason when transitioning to blocked. Cancel = no-op. Empty string = no reason in the email. Unblock fires immediately, no prompt.
+- Used `window.prompt` instead of a modal — admin-only, fewer moving parts. Upgrade later if it feels too rough.
+- API + Zod schema (`/api/admin/users/[uid]/block`) was already accepting `reason` from a prior session — only the UI was missing.
+
+**Env additions (already in `.env`):**
+```
+RESEND_API_KEY=re_DcQq9FQ9_…
+EMAIL_FROM="EduMeet <onboarding@resend.dev>"
+EMAIL_REPLY_TO=support@yourdomain.com
+EMAIL_TRANSPORT=resend
+```
+
+**New collection:** `emailLog` (constant `Collections.EMAIL_LOG`).
+
+**Deps added:** `resend@^6.12`, `@react-email/components@^1.0`.
+
+**Files added/touched (7.3):**
+```
+src/server/providers/email.ts                                   [new]
+src/server/email/templates/_layout.tsx                          [new]
+src/server/email/templates/teacher-approved.tsx                 [new]
+src/server/email/templates/teacher-rejected.tsx                 [new]
+src/server/email/templates/user-blocked.tsx                     [new]
+src/server/email/templates/user-unblocked.tsx                   [new]
+src/server/services/teacher-applications.service.ts             [+ approve/reject email dispatch]
+src/server/services/users.service.ts                            [+ block/unblock email dispatch]
+src/app/admin/users/page.tsx                                    [block prompt]
+src/app/admin/users/[uid]/page.tsx                              [block prompt]
+src/shared/constants/collections.ts                             [+ EMAIL_LOG]
+package.json                                                    [+ resend, @react-email/components]
+```
+
+### Session 7 — heads-up for next session
+
+1. **Resend domain not verified.** Until verified, only the email used to register the Resend account receives mail. All other recipients see `failed` rows in `emailLog`. Steps to verify: Resend dashboard → Domains → Add → set DNS records (one TXT, one MX) → switch `EMAIL_FROM` to `team@yourdomain.com`. No code change needed.
+2. **`EMAIL_TRANSPORT=resend` in `.env` means even local dev hits Resend.** Burns quota. Recommend flipping to `EMAIL_TRANSPORT=console` for dev (still writes audit log rows; no real send). The provider already defaults to `console` when the env is unset and `NODE_ENV !== "production"`.
+3. **`emailLog` collection has no TTL.** Will grow forever. Add a Cloud Function or scheduled cleanup if it gets noisy. Not urgent.
+4. **`EMAIL_REPLY_TO=support@yourdomain.com`** in `.env` is a placeholder. Currently rendered into the user-blocked email body as the contact address. Update or blank it before going live.
+5. **Cloudinary uploads aren't cleaned up on application edit/delete.** When a teacher replaces an image, the old one stays in Cloudinary. `destroyImage(publicId)` is exported from the provider but unused — wire if storage cost becomes a concern.
+6. **`useFieldArray.update` pitfall.** I deliberately used `useWatch` + `setValue` for the image field. If you add more file uploads via field arrays, do NOT use `update(i, …)` — it replaces the entry from a stale render snapshot and wipes typed text. Pattern in `apply/page.tsx#ImagePicker`.
+7. **Block reason UX is `window.prompt`.** Native, ugly, but functional. If you upgrade to a modal, keep the API contract identical (`POST /api/admin/users/[uid]/block` body: `{ blocked: bool, reason?: string }`) so the email fires off the same path.
+8. **Forgot password admin guard is hardcoded to `admin@spark.com`.** If you ever change the admin email or add multiple admins, the guard list lives in `src/app/auth/forgot/page.tsx` (`ADMIN_EMAIL` constant).
+9. **`ChangePasswordForm` requires recent sign-in.** If a teacher has been signed in for >hours, Firebase may throw `auth/requires-recent-login`. The error toast directs them to sign out + back in. No re-auth modal is wired (could add one).
+10. **Build status:** `npx tsc --noEmit` clean. `next build` not re-run. No commits this session — `git status` will show all the new + modified files.
+
+### What's still left (post-session-7)
+
+Same priorities as session 6, plus the email/upload follow-ups above. Untouched items:
+
+1. **Real-world QA pass on captions/translation** (carry-over from 6.6).
+2. **Admin portal expansion** — bulk import for agendas/notes/resources, durable slide decks (slides API on disk since 4.2). Teacher application + user blocking are now in good shape; the next admin-portal slice is content management.
+3. **Breakout Rooms backend** — still a static demo tab.
+4. **End-of-class summary PDF export** — modal already writes to `summaries/{meetingId}`; needs pdfkit builder + share.
+5. **Firestore mirror for live quiz** (`QUIZ_Q`/`QUIZ_A` are pubsub-only).
+6. **Cross-session caption translation cache.**
+7. **Other AI providers** (Gemini / Claude / Grok scaffolded but unbuilt).
+8. **Parent portal** (deferred).
+9. **Stripe payments** (not started).
 
 ---
 

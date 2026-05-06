@@ -12,6 +12,34 @@ import type {
   QuizDifficulty,
 } from "./enums";
 
+/* ── Credentials (shared by application + user profile) ── */
+export interface CredentialImage {
+  url: string;
+  publicId: string;
+}
+
+export interface TeacherExperienceEntry {
+  title: string;
+  organization: string;
+  years?: string;
+  description?: string;
+  image?: CredentialImage;
+}
+
+export interface TeacherCertificationEntry {
+  title: string;
+  issuer: string;
+  year?: string;
+  image?: CredentialImage;
+}
+
+export interface TeacherDegreeEntry {
+  title: string;
+  institution: string;
+  year?: string;
+  image?: CredentialImage;
+}
+
 /* ── Users ── */
 export interface User {
   uid: string;
@@ -26,6 +54,9 @@ export interface User {
   blockedAt?: string;
   blockReason?: string;
   applicationStatus?: "none" | "pending" | "approved" | "rejected";
+  experiences?: TeacherExperienceEntry[];
+  certifications?: TeacherCertificationEntry[];
+  degrees?: TeacherDegreeEntry[];
   createdAt: string;
   updatedAt: string;
 }
@@ -40,6 +71,9 @@ export interface TeacherApplication {
   yearsExperience: number;
   highestDegree: string;
   bio?: string;
+  experiences?: TeacherExperienceEntry[];
+  certifications?: TeacherCertificationEntry[];
+  degrees?: TeacherDegreeEntry[];
   status: "pending" | "approved" | "rejected";
   submittedAt: string;
   reviewedAt?: string;
