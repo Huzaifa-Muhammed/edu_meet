@@ -72,6 +72,13 @@ type ProgressResp = {
     pct: number;
     status: "correct" | "wrong" | "partial" | "pending";
   }[];
+  participation?: {
+    awayCount: number;
+    awaySeconds: number;
+    firstAwayAt: string | null;
+    lastAwayAt: string | null;
+    lastReturnedAt: string | null;
+  };
 };
 
 type SocialResp = {
@@ -542,6 +549,75 @@ function QuizTab({ meetingId }: { meetingId: string }) {
 
 /* ─────────── Progress ─────────── */
 
+function ParticipationCard({
+  participation,
+}: {
+  participation?: ProgressResp["participation"];
+}) {
+  const awayCount = participation?.awayCount ?? 0;
+  const awaySeconds = participation?.awaySeconds ?? 0;
+  const lastReturnedAt = participation?.lastReturnedAt ?? null;
+
+  const niceDuration = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return s === 0 ? `${m}m` : `${m}m ${s}s`;
+  };
+  const niceWhen = (iso: string | null) => {
+    if (!iso) return "—";
+    const diffMs = Date.now() - new Date(iso).getTime();
+    if (diffMs < 60_000) return "just now";
+    if (diffMs < 3_600_000) return `${Math.floor(diffMs / 60_000)}m ago`;
+    return `${Math.floor(diffMs / 3_600_000)}h ago`;
+  };
+
+  const flagged = awayCount > 0;
+  const ringColor = flagged ? "rgba(245,158,11,0.45)" : "rgba(74,232,160,0.35)";
+  const tintBg = flagged
+    ? "linear-gradient(135deg, rgba(245,158,11,0.10), rgba(8,16,30,0.55))"
+    : "linear-gradient(135deg, rgba(74,232,160,0.10), rgba(8,16,30,0.55))";
+
+  return (
+    <div
+      className="streak-card"
+      style={{
+        background: tintBg,
+        border: `1px solid ${ringColor}`,
+        gridTemplateColumns: "auto 1fr auto",
+      }}
+    >
+      <div className="streak-ico">{flagged ? "⚠️" : "✅"}</div>
+      <div>
+        <div className="streak-val">{awayCount}</div>
+        <div className="streak-lbl">
+          {awayCount === 1 ? "tab away" : "tab aways"}
+        </div>
+      </div>
+      <div
+        style={{
+          marginLeft: "auto",
+          textAlign: "right",
+          fontSize: 11,
+          lineHeight: 1.35,
+          color: "rgba(255,255,255,0.65)",
+        }}
+      >
+        {flagged ? (
+          <>
+            <div>{niceDuration(awaySeconds)} total away</div>
+            <div style={{ color: "rgba(255,255,255,0.4)" }}>
+              last return: {niceWhen(lastReturnedAt)}
+            </div>
+          </>
+        ) : (
+          <div>Fully focused — visible to your teacher.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ProgressTab({ meetingId }: { meetingId: string }) {
   const q = useQuery<ProgressResp>({
     queryKey: ["class-progress", meetingId],
@@ -625,6 +701,9 @@ function ProgressTab({ meetingId }: { meetingId: string }) {
           })}
         </>
       )}
+
+      <div className="prog-section">Class participation</div>
+      <ParticipationCard participation={data?.participation} />
 
       <div className="prog-section">Achievements</div>
       <div className="streak-card">

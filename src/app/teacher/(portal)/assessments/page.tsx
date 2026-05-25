@@ -21,10 +21,9 @@ export default function TeacherAssessmentsPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-bg p-6">
+    <div className="min-h-full bg-bg p-6">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-t">Assessments</h1>
+        <div className="mb-6 flex items-center justify-end">
           <button className="flex items-center gap-1.5 rounded-lg bg-acc px-3 py-2 text-xs font-semibold text-white hover:opacity-90">
             <Plus className="h-3.5 w-3.5" />
             Create Assessment

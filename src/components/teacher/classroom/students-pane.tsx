@@ -50,6 +50,53 @@ export function StudentsPane({
   // the durable bannedUids field on the meeting prevents rejoin.
   const { publish: publishKick } = usePubSub("STUDENT_KICK");
 
+  // STUDENT_AWAY / STUDENT_RETURNED — student switched tabs / minimized, vs.
+  // came back. WebRTC presence (`participants`) doesn't move, so this layers
+  // an attention signal on top.
+  const { messages: awayMsgs } = usePubSub("STUDENT_AWAY");
+  const { messages: returnedMsgs } = usePubSub("STUDENT_RETURNED");
+  const [tabAwayUids, setTabAwayUids] = useState<Set<string>>(new Set());
+  const [awayCounts, setAwayCounts] = useState<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    const last = awayMsgs[awayMsgs.length - 1];
+    if (!last) return;
+    try {
+      const p = JSON.parse(last.message as unknown as string) as { uid?: string };
+      if (!p.uid) return;
+      setTabAwayUids((prev) => {
+        if (prev.has(p.uid!)) return prev;
+        const next = new Set(prev);
+        next.add(p.uid!);
+        return next;
+      });
+      setAwayCounts((prev) => {
+        const next = new Map(prev);
+        next.set(p.uid!, (next.get(p.uid!) ?? 0) + 1);
+        return next;
+      });
+    } catch {
+      // skip malformed
+    }
+  }, [awayMsgs.length]);
+
+  useEffect(() => {
+    const last = returnedMsgs[returnedMsgs.length - 1];
+    if (!last) return;
+    try {
+      const p = JSON.parse(last.message as unknown as string) as { uid?: string };
+      if (!p.uid) return;
+      setTabAwayUids((prev) => {
+        if (!prev.has(p.uid!)) return prev;
+        const next = new Set(prev);
+        next.delete(p.uid!);
+        return next;
+      });
+    } catch {
+      // skip malformed
+    }
+  }, [returnedMsgs.length]);
+
   const kickMut = useMutation({
     mutationFn: (uid: string) =>
       api.post(`/meetings/${meetingId}/kick`, { uid, banned: true }),
@@ -101,21 +148,23 @@ export function StudentsPane({
         | undefined;
       const isLive = !!p;
       const micOn = p?.micOn ?? false;
-      return { ...s, live: isLive, micOn };
+      const tabAway = tabAwayUids.has(s.uid);
+      const awayCount = awayCounts.get(s.uid) ?? 0;
+      return { ...s, live: isLive, micOn, tabAway, awayCount };
     });
-  }, [students, participants]);
+  }, [students, participants, tabAwayUids, awayCounts]);
 
   const filtered = rows.filter((r) => {
     const q = query.trim().toLowerCase();
     if (q && !(r.displayName ?? r.email ?? "").toLowerCase().includes(q)) return false;
-    if (filter === "away" && r.live) return false;
+    if (filter === "away" && r.live && !r.tabAway) return false;
     if (filter === "muted" && r.micOn) return false;
     return true;
   });
 
   const total = rows.length;
-  const attentive = rows.filter((r) => r.live).length;
-  const away = rows.filter((r) => !r.live).length;
+  const attentive = rows.filter((r) => r.live && !r.tabAway).length;
+  const away = rows.filter((r) => !r.live || r.tabAway).length;
   const muted = rows.filter((r) => r.live && !r.micOn).length;
 
   const toggleAll = () => {
@@ -432,7 +481,15 @@ function StudentRow({
   onKick,
   kicking,
 }: {
-  row: { uid: string; displayName?: string; email?: string; live: boolean; micOn: boolean };
+  row: {
+    uid: string;
+    displayName?: string;
+    email?: string;
+    live: boolean;
+    micOn: boolean;
+    tabAway: boolean;
+    awayCount: number;
+  };
   checked: boolean;
   onToggle: () => void;
   points: number;
@@ -464,10 +521,33 @@ function StudentRow({
         </div>
       </div>
       <div className="flex justify-center">
-        {row.live ? (
-          <span className="inline-flex items-center gap-1 rounded-full border border-gbd bg-gbg px-2 py-0.5 text-[9px] font-semibold text-gt">
+        {row.live && row.tabAway ? (
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-semibold"
+            style={{
+              background: "rgba(245,158,11,0.14)",
+              border: "1px solid rgba(245,158,11,0.45)",
+              color: "#B45309",
+            }}
+            title={`Switched tabs or minimized · ${row.awayCount}× this class`}
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: "#F59E0B" }}
+            />
+            Tab away{row.awayCount > 1 ? ` · ${row.awayCount}×` : ""}
+          </span>
+        ) : row.live ? (
+          <span
+            className="inline-flex items-center gap-1 rounded-full border border-gbd bg-gbg px-2 py-0.5 text-[9px] font-semibold text-gt"
+            title={
+              row.awayCount > 0
+                ? `Online · stepped away ${row.awayCount}× earlier`
+                : undefined
+            }
+          >
             <span className="h-1.5 w-1.5 rounded-full bg-green" />
-            Online
+            Online{row.awayCount > 0 ? ` · ${row.awayCount}×` : ""}
           </span>
         ) : (
           <span className="inline-flex items-center gap-1 rounded-full border border-rbd bg-rbg px-2 py-0.5 text-[9px] font-semibold text-rt">

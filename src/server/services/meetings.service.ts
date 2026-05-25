@@ -134,13 +134,76 @@ export const meetingsService = {
     meetingId: string,
     uid: string,
     type: "join" | "leave" | "hand" | "mic" | "away" | "attentive",
+    durationMs?: number,
   ) {
+    const now = new Date().toISOString();
     await adminDb.collection(Collections.ATTENDANCE_EVENTS).add({
       meetingId,
       uid,
       type,
-      ts: new Date().toISOString(),
+      durationMs: durationMs ?? null,
+      ts: now,
     });
+
+    if (type === "away" || type === "attentive") {
+      const { FieldValue } = await import("firebase-admin/firestore");
+      const partRef = adminDb
+        .collection(Collections.MEETINGS)
+        .doc(meetingId)
+        .collection("participation")
+        .doc(uid);
+
+      if (type === "away") {
+        const snap = await partRef.get();
+        const update: Record<string, unknown> = {
+          uid,
+          meetingId,
+          awayCount: FieldValue.increment(1),
+          lastAwayAt: now,
+        };
+        if (!snap.exists || !snap.data()?.firstAwayAt) {
+          update.firstAwayAt = now;
+        }
+        await partRef.set(update, { merge: true });
+      } else {
+        const seconds = Math.max(0, Math.round((durationMs ?? 0) / 1000));
+        await partRef.set(
+          {
+            uid,
+            meetingId,
+            awaySeconds: FieldValue.increment(seconds),
+            lastReturnedAt: now,
+          },
+          { merge: true },
+        );
+      }
+    }
+  },
+
+  async getParticipation(meetingId: string, uid: string) {
+    const doc = await adminDb
+      .collection(Collections.MEETINGS)
+      .doc(meetingId)
+      .collection("participation")
+      .doc(uid)
+      .get();
+    if (!doc.exists) {
+      return {
+        awayCount: 0,
+        awaySeconds: 0,
+        firstAwayAt: null as string | null,
+        lastAwayAt: null as string | null,
+        lastReturnedAt: null as string | null,
+      };
+    }
+    const data = doc.data() ?? {};
+    return {
+      awayCount: (data.awayCount as number | undefined) ?? 0,
+      awaySeconds: (data.awaySeconds as number | undefined) ?? 0,
+      firstAwayAt: (data.firstAwayAt as string | undefined) ?? null,
+      lastAwayAt: (data.lastAwayAt as string | undefined) ?? null,
+      lastReturnedAt: (data.lastReturnedAt as string | undefined) ?? null,
+    };
   },
 
   async kickStudent(meetingId: string, uid: string, teacherUid: string) {

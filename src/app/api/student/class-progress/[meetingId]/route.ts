@@ -6,6 +6,7 @@ import { requireRole } from "@/server/auth/require-role";
 import { adminDb } from "@/server/firebase-admin";
 import { Collections } from "@/shared/constants/collections";
 import { brainTokensService } from "@/server/services/brain-tokens.service";
+import { meetingsService } from "@/server/services/meetings.service";
 import { ok, fail } from "@/server/utils/response";
 
 type Submission = {
@@ -51,6 +52,13 @@ export async function GET(
         totalClassmates: 0,
         topics: [],
         questions: [],
+        participation: {
+          awayCount: 0,
+          awaySeconds: 0,
+          firstAwayAt: null,
+          lastAwayAt: null,
+          lastReturnedAt: null,
+        },
       });
     }
     const classroomId = (meetingDoc.data() as { classroomId?: string }).classroomId ?? "";
@@ -122,6 +130,11 @@ export async function GET(
       totalClassmates = ((cr.data() as { studentIds?: string[] }).studentIds ?? []).length;
     }
 
+    const participation = await meetingsService.getParticipation(
+      meetingId,
+      user.uid,
+    );
+
     return ok({
       correct,
       answered,
@@ -132,6 +145,7 @@ export async function GET(
       totalClassmates,
       topics: [] as { name: string; icon: string; bg: string; pct: number; color: string }[],
       questions,
+      participation,
     });
   } catch (e) {
     return fail(e);

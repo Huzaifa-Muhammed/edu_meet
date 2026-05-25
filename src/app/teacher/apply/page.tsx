@@ -87,7 +87,11 @@ export default function TeacherApplyPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  const liveStatus = appQ.data?.status ?? user?.applicationStatus;
+  // user.status / user.applicationStatus is the gate (see /teacher/layout.tsx).
+  // Trust it first; the API-returned application status is treated as an
+  // audit record that can lag behind.
+  const liveStatus =
+    user?.status ?? user?.applicationStatus ?? appQ.data?.status;
   useEffect(() => {
     if (liveStatus === "approved") {
       refreshUser().then(() => router.replace("/teacher/dashboard"));
@@ -108,7 +112,12 @@ export default function TeacherApplyPage() {
   }
 
   const application = appQ.data;
-  const status = application?.status ?? user.applicationStatus ?? "none";
+  // Same precedence as liveStatus: user doc wins, app doc as fallback only.
+  const status =
+    user.status ??
+    user.applicationStatus ??
+    application?.status ??
+    "none";
   const showForm = status === "none" || status === "rejected";
 
   return (

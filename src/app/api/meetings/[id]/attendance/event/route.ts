@@ -8,6 +8,7 @@ import { ok, fail } from "@/server/utils/response";
 
 const AttendanceSchema = z.object({
   type: z.enum(["join", "leave", "hand", "mic", "away", "attentive"]),
+  durationMs: z.number().int().nonnegative().optional(),
 });
 
 export async function POST(
@@ -17,8 +18,8 @@ export async function POST(
   try {
     const user = await verifyToken(req);
     const { id } = await ctx.params;
-    const { type } = AttendanceSchema.parse(await req.json());
-    await meetingsService.logAttendance(id, user.uid, type);
+    const { type, durationMs } = AttendanceSchema.parse(await req.json());
+    await meetingsService.logAttendance(id, user.uid, type, durationMs);
     return ok({ logged: true });
   } catch (e) {
     return fail(e);

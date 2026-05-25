@@ -27,7 +27,7 @@ export default function TeacherClassesPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 overflow-y-auto bg-bg p-6">
+      <div className="min-h-full bg-bg p-6">
         <div className="mx-auto max-w-5xl">
           <div className="h-40 animate-pulse rounded-xl bg-panel" />
         </div>
@@ -36,15 +36,9 @@ export default function TeacherClassesPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-bg p-6">
+    <div className="min-h-full bg-bg p-6">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-t">Live & Scheduled Classes</h1>
-            <p className="text-xs text-t3">
-              Start a new class — students with matching subjects will see it on their dashboard.
-            </p>
-          </div>
+        <div className="mb-6 flex items-center justify-end">
           <button
             onClick={() => setOpen(true)}
             className="flex items-center gap-1.5 rounded-lg bg-acc px-3 py-2 text-xs font-semibold text-white hover:opacity-90"

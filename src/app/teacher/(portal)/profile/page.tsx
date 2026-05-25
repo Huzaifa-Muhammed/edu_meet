@@ -36,10 +36,9 @@ export default function TeacherProfilePage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-bg p-6">
+    <div className="min-h-full bg-bg p-6">
       <div className="mx-auto max-w-3xl space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-t">Profile & Settings</h1>
+        <div className="flex justify-end">
           <button
             onClick={logout}
             className="flex items-center gap-1.5 rounded-lg border border-bd px-3 py-1.5 text-xs font-medium text-t2 hover:bg-panel"

@@ -28,6 +28,8 @@ type Tab = "video" | "questions" | "students" | "breakout";
 
 export function MainArea({
   classroomId,
+  classroomName,
+  classroomSubject,
   meetingId,
   isMod,
   whiteboardOn,
@@ -40,6 +42,8 @@ export function MainArea({
   onEnd,
 }: {
   classroomId: string;
+  classroomName?: string;
+  classroomSubject?: string;
   meetingId: string;
   isMod: boolean;
   whiteboardOn: boolean;
@@ -295,7 +299,13 @@ export function MainArea({
         </div>
       )}
 
-      {tab === "questions" && <QuestionsPane classroomId={classroomId} />}
+      {tab === "questions" && (
+        <QuestionsPane
+          classroomId={classroomId}
+          classroomName={classroomName}
+          classroomSubject={classroomSubject}
+        />
+      )}
       {tab === "students" && (
         <StudentsPane classroomId={classroomId} meetingId={meetingId} />
       )}

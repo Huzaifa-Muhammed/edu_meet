@@ -40,12 +40,20 @@ export interface TeacherDegreeEntry {
   image?: CredentialImage;
 }
 
-/* ── Users ── */
+/* ── Users ──
+ * Teacher application data lives directly on the user doc. The admin
+ * "applications" list is just `users where role==teacher` filtered by
+ * `applicationStatus`. There is no separate teacherApplications collection
+ * in the current data model. */
 export interface User {
   uid: string;
   role: UserRole;
   email: string;
+  /** Canonical display name. Legacy/externally-created docs may also have
+   * `name` — readers should prefer `displayName ?? name`, and the auth/
+   * application flows mirror them so both stay populated. */
   displayName: string;
+  name?: string;
   photoUrl?: string;
   bio?: string;
   subjects?: string[];
@@ -53,15 +61,30 @@ export interface User {
   blocked?: boolean;
   blockedAt?: string;
   blockReason?: string;
+
+  /* Teacher application fields — only meaningful when role === "teacher".
+   * `status` is the canonical field; `applicationStatus` is its mirror for
+   * back-compat with older code paths. Readers should accept either. */
+  status?: "none" | "pending" | "approved" | "rejected";
   applicationStatus?: "none" | "pending" | "approved" | "rejected";
+  applicationSubject?: string;
+  applicationYearsExperience?: number;
+  applicationHighestDegree?: string;
+  applicationSubmittedAt?: string;
+  applicationReviewedAt?: string;
+  applicationReviewedBy?: string;
+  applicationReviewNote?: string;
   experiences?: TeacherExperienceEntry[];
   certifications?: TeacherCertificationEntry[];
   degrees?: TeacherDegreeEntry[];
+
   createdAt: string;
   updatedAt: string;
 }
 
-/* ── Teacher applications ── */
+/* ── Teacher application (view type) ──
+ * Assembled from a User doc on read so admin pages + email templates can
+ * keep their existing field names. `id` === `uid`. */
 export interface TeacherApplication {
   id: string;
   uid: string;

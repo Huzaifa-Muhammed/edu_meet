@@ -15,18 +15,20 @@ export async function GET(req: NextRequest) {
     const usersSnap = await adminDb.collection(Collections.USERS).get();
     let teachers = 0,
       students = 0,
-      blocked = 0;
+      blocked = 0,
+      pendingApps = 0;
     usersSnap.docs.forEach((d) => {
-      const data = d.data() as { role?: string; blocked?: boolean };
+      const data = d.data() as {
+        role?: string;
+        blocked?: boolean;
+        applicationStatus?: string;
+      };
       if (data.role === "teacher") teachers++;
       if (data.role === "student") students++;
       if (data.blocked) blocked++;
+      if (data.role === "teacher" && data.applicationStatus === "pending")
+        pendingApps++;
     });
-
-    const pendingAppsSnap = await adminDb
-      .collection(Collections.TEACHER_APPLICATIONS)
-      .where("status", "==", "pending")
-      .get();
 
     const openTicketsSnap = await adminDb
       .collection(Collections.SUPPORT_TICKETS)
@@ -42,7 +44,7 @@ export async function GET(req: NextRequest) {
       teachers,
       students,
       blocked,
-      pendingApplications: pendingAppsSnap.size,
+      pendingApplications: pendingApps,
       openTickets: openTicketsSnap.size,
       classrooms: classroomsSnap.size,
     });

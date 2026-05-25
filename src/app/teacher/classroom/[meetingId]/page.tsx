@@ -120,6 +120,7 @@ export default function ClassroomPage() {
 
   const { token, roomId, isMod, participantId, displayName } = tokenQ.data;
   const classroomName = classroomQ.data?.name ?? "Class in session";
+  const classroomSubject = (classroomQ.data as { subjectName?: string } | undefined)?.subjectName;
   const initial =
     (user?.displayName ?? displayName ?? "T").trim().slice(0, 1).toUpperCase();
 
@@ -135,6 +136,7 @@ export default function ClassroomPage() {
     >
       <ClassroomShell
         classroomName={classroomName}
+        classroomSubject={classroomSubject}
         classroomId={meetingQ.data!.classroomId}
         meetingId={meetingId}
         initial={initial}
@@ -166,6 +168,7 @@ export default function ClassroomPage() {
 /** Inner shell that runs inside the MeetingProvider so pubsub hooks are usable. */
 function ClassroomShell({
   classroomName,
+  classroomSubject,
   classroomId,
   meetingId,
   initial,
@@ -188,6 +191,7 @@ function ClassroomShell({
   onConfirmEnd,
 }: {
   classroomName: string;
+  classroomSubject?: string;
   classroomId: string;
   meetingId: string;
   initial: string;
@@ -246,6 +250,8 @@ function ClassroomShell({
         />
         <MainArea
           classroomId={classroomId}
+          classroomName={classroomName}
+          classroomSubject={classroomSubject}
           meetingId={meetingId}
           isMod={isMod}
           whiteboardOn={whiteboardOn}
@@ -261,6 +267,7 @@ function ClassroomShell({
           <CopilotPanel
             classroomName={classroomName}
             classroomId={classroomId}
+            subject={classroomSubject}
             onClose={() => setCopilotOpen(false)}
           />
         )}

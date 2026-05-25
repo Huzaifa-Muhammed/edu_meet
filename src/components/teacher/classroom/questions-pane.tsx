@@ -24,7 +24,15 @@ type Filter = "all" | "pending" | "answered";
  *  — Students submit questions via POST /api/classrooms/:id/questions
  *  — Teacher sees them here; can mark answered / pin / delete
  *  — Pubsub `NEW_QUESTION` triggers a background refetch so this updates live */
-export function QuestionsPane({ classroomId }: { classroomId: string }) {
+export function QuestionsPane({
+  classroomId,
+  classroomName,
+  classroomSubject,
+}: {
+  classroomId: string;
+  classroomName?: string;
+  classroomSubject?: string;
+}) {
   const qc = useQueryClient();
   const [filter, setFilter] = useState<Filter>("all");
   const [discussingId, setDiscussingId] = useState<string | null>(null);
@@ -65,6 +73,14 @@ export function QuestionsPane({ classroomId }: { classroomId: string }) {
     setAiLoadingId(q.id);
     try {
       const token = await getFirebaseAuth().currentUser?.getIdToken();
+      // Include classroom + subject context so the answer is grounded in the
+      // right domain (e.g. "function" in Math vs Computer Science).
+      const context = [
+        classroomName ? `Class: "${classroomName}"` : null,
+        classroomSubject ? `Subject: ${classroomSubject}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: {
@@ -75,10 +91,12 @@ export function QuestionsPane({ classroomId }: { classroomId: string }) {
           messages: [
             {
               role: "user",
-              content: `A student named ${q.askedByName} asked this question in a live class:
+              content: `${
+                context ? `${context}\n\n` : ""
+              }A student named ${q.askedByName} asked this question in a live class:
 "${q.text}"
 
-Answer directly and clearly in 2-4 sentences. No preamble — start with the answer.`,
+Answer directly and clearly in 2-4 sentences for a student in this class. Use the subject above to disambiguate domain-specific terms. No preamble — start with the answer.`,
             },
           ],
           temperature: 0.4,

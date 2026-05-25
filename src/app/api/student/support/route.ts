@@ -17,7 +17,7 @@ const Schema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const user = await verifyToken(req);
-    requireRole(user, ["student"]);
+    requireRole(user, ["student", "teacher"]);
     const body = Schema.parse(await req.json());
     const ticket = await supportService.create(user.uid, body);
     return ok(ticket, 201);

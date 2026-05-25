@@ -16,6 +16,7 @@ import { getFirebaseAuth } from "@/lib/firebase/client";
 import api from "@/lib/api/client";
 import { useAuth } from "@/providers/auth-provider";
 import type { ChatMessage } from "@/server/services/class-chat.service";
+import type { ClassQuestion } from "@/server/services/class-questions.service";
 
 type Msg = { role: "user" | "assistant"; content: string };
 type Tab = "insights" | "class-chat" | "trends" | "chat";
@@ -41,11 +42,14 @@ type Trend = {
   sessions: number;
 };
 
+/** Quick-prompts. The Ask-AI tab grounds each of these with the live class
+ *  context (participants, hands, pending questions, reactions, recent chat)
+ *  so the AI answers with real names + numbers instead of generic platitudes. */
 const SUGGESTIONS = [
-  "Who needs attention?",
-  "Suggest next teaching step",
-  "Summarise engagement",
-  "Generate a quick quiz",
+  "Who needs attention right now?",
+  "What should I do next in this class?",
+  "Summarise current engagement",
+  "Generate 3 quick MCQs on this topic",
 ];
 
 export function CopilotPanel({
@@ -177,7 +181,14 @@ Types: red=urgent student issue, amber=minor concern, blue=info, green=positive,
       )}
       {tab === "class-chat" && <ClassChatTab classroomId={classroomId} />}
       {tab === "trends" && <TrendsTab trends={trends} />}
-      {tab === "chat" && <AskAiTab classroomName={classroomName} subject={subject} />}
+      {tab === "chat" && (
+        <AskAiTab
+          classroomName={classroomName}
+          classroomId={classroomId}
+          subject={subject}
+          participants={participants}
+        />
+      )}
     </aside>
   );
 }
@@ -438,24 +449,185 @@ function TrendsTab({ trends }: { trends: Trend[] }) {
 
 function AskAiTab({
   classroomName,
+  classroomId,
   subject,
+  participants,
 }: {
   classroomName: string;
+  classroomId: string;
   subject?: string;
+  participants: Map<string, unknown>;
 }) {
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "assistant",
-      content: `Hi — I'm your in-class Copilot. I can suggest quick checks, spot students who need help, or explain a concept. Ask me anything about "${classroomName}".`,
+      content: `Hi — I'm your in-class Copilot. I see who's in the class, who has questions or raised hands, and recent chat. Ask me anything about "${classroomName}"${
+        subject ? ` (${subject})` : ""
+      }.`,
     },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Live data sources — refresh every 15s, plus pubsub nudges
+  const { data: questions = [] } = useQuery({
+    queryKey: ["class-questions", classroomId],
+    queryFn: () =>
+      api.get(
+        `/classrooms/${classroomId}/questions`,
+      ) as unknown as Promise<ClassQuestion[]>,
+    enabled: !!classroomId,
+    refetchInterval: 15_000,
+  });
+
+  const { data: chatHistory = [] } = useQuery({
+    queryKey: ["class-chat", classroomId],
+    queryFn: () =>
+      api.get(
+        `/classrooms/${classroomId}/chat`,
+      ) as unknown as Promise<ChatMessage[]>,
+    enabled: !!classroomId,
+    refetchInterval: 20_000,
+  });
+
+  // Raised hands (latest-per-uid, ignore cleared events) + reactions
+  const { messages: handMsgs } = usePubSub("HAND_RAISE");
+  const { messages: reactionMsgs } = usePubSub("REACTION");
+
+  const hands = useMemo(() => {
+    const latest = new Map<string, { name: string; at: number; raised: boolean }>();
+    for (const m of handMsgs) {
+      try {
+        const p = JSON.parse(m.message as unknown as string) as {
+          uid: string;
+          name: string;
+          state: "raised" | "lowered";
+          at: number;
+        };
+        const prev = latest.get(p.uid);
+        if (prev && prev.at >= p.at) continue;
+        latest.set(p.uid, {
+          name: p.name,
+          at: p.at,
+          raised: p.state === "raised",
+        });
+      } catch {
+        /* skip malformed */
+      }
+    }
+    return [...latest.values()].filter((h) => h.raised);
+  }, [handMsgs]);
+
+  const reactions = useMemo(() => {
+    const latest = new Map<
+      string,
+      { name: string; type: "ok" | "confused"; active: boolean; at: number }
+    >();
+    const now = Date.now();
+    for (const m of reactionMsgs) {
+      try {
+        const p = JSON.parse(m.message as unknown as string) as {
+          uid: string;
+          name: string;
+          type: "ok" | "confused";
+          state?: "active" | "cleared";
+          at?: number;
+        };
+        const at = p.at ?? now;
+        const key = `${p.uid}|${p.type}`;
+        const prev = latest.get(key);
+        if (prev && prev.at >= at) continue;
+        latest.set(key, {
+          name: p.name,
+          type: p.type,
+          active: p.state !== "cleared",
+          at,
+        });
+      } catch {
+        /* skip */
+      }
+    }
+    // Active reactions within last 90s
+    const cutoff = Date.now() - 90_000;
+    return [...latest.values()].filter((r) => r.active && r.at >= cutoff);
+  }, [reactionMsgs]);
+
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: "smooth",
+    });
   }, [messages, loading]);
+
+  function buildContext(): string {
+    const studentNames: string[] = [];
+    let micOn = 0;
+    let camOn = 0;
+    for (const p of participants.values()) {
+      const q = p as {
+        displayName?: string;
+        micOn?: boolean;
+        webcamOn?: boolean;
+      };
+      if (q.displayName) studentNames.push(q.displayName);
+      if (q.micOn) micOn++;
+      if (q.webcamOn) camOn++;
+    }
+
+    const pending = questions.filter((q) => q.status === "pending");
+    const confused = reactions.filter((r) => r.type === "confused");
+    const gotIt = reactions.filter((r) => r.type === "ok");
+
+    const lines: string[] = [];
+    lines.push(`# Live class snapshot`);
+    lines.push(`Class: "${classroomName}"${subject ? ` · Subject: ${subject}` : ""}`);
+    lines.push(
+      `Participants (${participants.size}): ${studentNames.slice(0, 12).join(", ") || "—"}${
+        studentNames.length > 12 ? ` (+${studentNames.length - 12} more)` : ""
+      }`,
+    );
+    lines.push(`Mics on: ${micOn} · Cams on: ${camOn}`);
+
+    if (hands.length) {
+      lines.push(
+        `Raised hands (${hands.length}): ${hands
+          .map((h) => h.name)
+          .slice(0, 8)
+          .join(", ")}`,
+      );
+    } else {
+      lines.push(`Raised hands: none`);
+    }
+
+    if (confused.length || gotIt.length) {
+      lines.push(
+        `Reactions (last 90s): 😕 confused = ${confused.length} (${confused
+          .map((r) => r.name)
+          .slice(0, 5)
+          .join(", ")}), 👍 got it = ${gotIt.length}`,
+      );
+    }
+
+    if (pending.length) {
+      lines.push(`\nPending student questions (${pending.length}):`);
+      for (const q of pending.slice(0, 8)) {
+        lines.push(`- ${q.askedByName}: "${q.text}"`);
+      }
+    } else {
+      lines.push(`Pending student questions: none`);
+    }
+
+    const recentChat = chatHistory.slice(-6);
+    if (recentChat.length) {
+      lines.push(`\nRecent chat (last ${recentChat.length}):`);
+      for (const m of recentChat) {
+        lines.push(`- ${m.senderName} (${m.senderRole}): ${m.text}`);
+      }
+    }
+
+    return lines.join("\n");
+  }
 
   async function send(override?: string) {
     const prompt = (override ?? input).trim();
@@ -465,18 +637,25 @@ function AskAiTab({
     setInput("");
     setLoading(true);
 
-    const ctx = `You are helping a teacher running a live class called "${classroomName}"${
-      subject ? ` (subject: ${subject})` : ""
-    }. Keep replies under 80 words and concrete.`;
+    // System prompt + fresh class snapshot, rebuilt on each send so the AI
+    // sees the latest state (hands raised since the last message, new
+    // questions, etc).
+    const sys = `You are an in-class teaching co-pilot. You're given a real-time snapshot of the live class. Use names and numbers from the snapshot when answering — do not make up details. Keep replies under 100 words, concrete, and actionable. If the snapshot doesn't have enough info to answer, say so briefly and suggest what data would help.`;
+    const ctx = buildContext();
 
     try {
       const token = await getFirebaseAuth().currentUser?.getIdToken();
       const res = await fetch("/api/ai/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           stream: true,
+          temperature: 0.4,
           messages: [
+            { role: "system", content: sys },
             { role: "system", content: ctx },
             ...next.map((m) => ({ role: m.role, content: m.content })),
           ],
@@ -493,7 +672,10 @@ function AskAiTab({
         const { value, done } = await reader.read();
         if (done) break;
         acc += decoder.decode(value, { stream: true });
-        setMessages((m) => [...m.slice(0, -1), { role: "assistant", content: acc }]);
+        setMessages((m) => [
+          ...m.slice(0, -1),
+          { role: "assistant", content: acc },
+        ]);
       }
     } catch (err) {
       setMessages((m) => [

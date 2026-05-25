@@ -19,7 +19,10 @@ export default function TeacherLayout({
   useEffect(() => {
     if (loading || !authorized || !user) return;
     const onApplyPage = pathname === "/teacher/apply";
-    const approved = user.applicationStatus === "approved";
+    // Accept either field — `status` is canonical, `applicationStatus` is
+    // mirrored for back-compat with older code paths.
+    const approved =
+      user.status === "approved" || user.applicationStatus === "approved";
 
     if (!approved && !onApplyPage) {
       router.replace("/teacher/apply");
@@ -31,7 +34,7 @@ export default function TeacherLayout({
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-bg">
+      <div className="teacher-ui flex h-screen items-center justify-center bg-bg">
         <div className="text-sm text-t3">Loading...</div>
       </div>
     );
@@ -39,5 +42,9 @@ export default function TeacherLayout({
 
   if (!authorized) return null;
 
-  return <>{children}</>;
+  return (
+    <div className="teacher-ui flex h-screen flex-col overflow-hidden bg-bg">
+      {children}
+    </div>
+  );
 }

@@ -17,19 +17,25 @@ export async function POST(req: NextRequest) {
 
     if (!userDoc.exists) {
       const role = body.role ?? "student";
+      const displayName = decoded.name ?? decoded.email?.split("@")[0] ?? "";
       const newUser = {
         email: decoded.email ?? "",
-        displayName: decoded.name ?? decoded.email?.split("@")[0] ?? "",
+        displayName,
+        // `name` mirrors `displayName` for back-compat with legacy/manual docs
+        // that only set `name`. Both fields stay in sync going forward.
+        name: displayName,
         photoUrl: decoded.picture ?? null,
         role,
         // Teachers must complete the application before accessing the portal.
-        applicationStatus: role === "teacher" ? "none" : "approved",
+        // Canonical field is `status`; legacy docs sometimes used
+        // `applicationStatus` — readers should accept either.
+        status: role === "teacher" ? "none" : "approved",
         blocked: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       await userRef.set(newUser);
-      return ok({ uid: decoded.uid, ...newUser }, 201);
+      return ok({ uid: decoded.uid, ...newUser, applicationStatus: newUser.status }, 201);
     }
 
     const data = userDoc.data()!;
@@ -38,10 +44,20 @@ export async function POST(req: NextRequest) {
       throw forbidden("Your account has been blocked. Contact support.");
     }
 
-    // Return the full user doc so the client sees subjects, bio, etc.
+    // Normalise legacy field names so the client always sees both shapes.
+    // The rest of the app reads `applicationStatus` and `displayName`;
+    // some Firestore docs only have `status` and `name`.
+    const normalized = {
+      ...data,
+      applicationStatus: data.applicationStatus ?? data.status,
+      status: data.status ?? data.applicationStatus,
+      displayName: data.displayName ?? data.name,
+      name: data.name ?? data.displayName,
+    };
+
     return ok({
       uid: decoded.uid,
-      ...data,
+      ...normalized,
     });
   } catch (e) {
     return fail(e);

@@ -13,6 +13,8 @@ import { StudentClassroomTopbar } from "@/components/student/classroom/student-c
 import { StudentLeftPanel } from "@/components/student/classroom/student-left-panel";
 import { StudentRightPanel } from "@/components/student/classroom/student-right-panel";
 import { StudentMainArea } from "@/components/student/classroom/student-main-area";
+import { AwayWarningModal } from "@/components/student/classroom/away-warning-modal";
+import { useAttentionTracker } from "@/hooks/use-attention-tracker";
 import { useAuth } from "@/providers/auth-provider";
 
 type TokenResponse = {
@@ -195,6 +197,12 @@ function ClassroomShell({
   const [theme, setTheme] = useState<ClassroomTheme>("glass");
   const { user } = useAuth();
   const { publish: publishHand } = usePubSub("HAND_RAISE");
+  const { awayEvent, dismissAwayEvent } = useAttentionTracker({
+    enabled: !!user?.uid,
+    meetingId,
+    uid: user?.uid,
+    name: user?.displayName ?? "Student",
+  });
 
   useEffect(() => {
     try {
@@ -230,6 +238,11 @@ function ClassroomShell({
       <div className="classroom-mesh" aria-hidden />
       <ModerationReceiver isMod={false} />
       <KickReceiver myUid={user?.uid} onKicked={onLeave} />
+      <AwayWarningModal
+        open={!!awayEvent}
+        durationMs={awayEvent?.durationMs ?? 0}
+        onAcknowledge={dismissAwayEvent}
+      />
       <StudentClassroomTopbar
         classroomName={classroomName}
         subjectName={subjectName}

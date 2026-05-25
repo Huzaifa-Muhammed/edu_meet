@@ -36,4 +36,6 @@ export const Collections = {
   REJOIN_REQUESTS: "rejoinRequests",
   TEACHER_APPLICATIONS: "teacherApplications",
   EMAIL_LOG: "emailLog",
+  TEACHER_RESOURCES: "teacherResources",
+  LESSON_TEMPLATES: "lessonTemplates",
 } as const;

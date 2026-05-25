@@ -36,7 +36,8 @@ export async function verifyToken(req: NextRequest): Promise<AuthUser> {
       uid: decoded.uid,
       email: decoded.email ?? data.email,
       role: data.role,
-      displayName: data.displayName ?? decoded.name ?? "",
+      // Legacy docs use `name` instead of `displayName`. Accept either.
+      displayName: data.displayName ?? data.name ?? decoded.name ?? "",
       photoUrl: data.photoUrl ?? decoded.picture,
     };
   } catch (err) {

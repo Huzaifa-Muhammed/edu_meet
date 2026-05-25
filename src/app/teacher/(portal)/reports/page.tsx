@@ -74,7 +74,7 @@ export default function TeacherReportsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 overflow-y-auto bg-bg p-6">
+      <div className="min-h-full bg-bg p-6">
         <div className="mx-auto max-w-5xl">
           <div className="h-8 w-48 animate-pulse rounded bg-panel" />
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -88,15 +88,8 @@ export default function TeacherReportsPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-bg p-6">
+    <div className="min-h-full bg-bg p-6">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-6">
-          <h1 className="text-lg font-semibold text-t">Student Reports</h1>
-          <p className="text-xs text-t3">
-            Participation and average assessment scores across all your classes.
-          </p>
-        </div>
-
         {totals && (
           <div className="mb-6 grid gap-3 sm:grid-cols-3">
             <KpiCard
