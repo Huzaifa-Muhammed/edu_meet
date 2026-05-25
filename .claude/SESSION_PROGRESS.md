@@ -22,7 +22,7 @@ Audited student + admin portals to extract their shared design system (60px side
 
 **Auth hero (`.auth-hero` + supporting CSS)** — pure-CSS animated background for the left side of every auth page:
 - Animated radial-gradient mesh shifting position over 22s (`authMeshShift` keyframes)
-- 3 blurred color orbs floating around (`.auth-orb.o1/o2/o3` with `authOrbFloat` keyframes — 14–22s cycles)
+- 3 blurred color orbs floating around (`.auth-orb.o1/o2/o3` with `authOrbFloat` keyframes — 16/19/22s cycles, staggered delays)
 - 5 drifting education emoji glyphs (📚 🎓 ✏️ 🧮 💡 via `.auth-glyph` + `authGlyphDrift` keyframes)
 - SVG turbulence noise overlay at 4% opacity for grain
 - Zero JS, zero deps. User initially asked for Spline but pivoted to "do this in CSS instead"
@@ -59,7 +59,7 @@ Audited student + admin portals to extract their shared design system (60px side
 - Auth palette: indigo→purple gradient
 
 **Files added (3):** `teacher-sidenav.tsx`, `teacher-topbar.tsx`, `auth-hero.tsx`.
-**Files modified (12):** globals.css, layout.tsx (root + teacher + (portal) + auth), 5 teacher page strip, 3 auth pages.
+**Files modified (13):** `globals.css`, root `layout.tsx` (font weights), `teacher/layout.tsx`, `teacher/(portal)/layout.tsx`, `auth/layout.tsx`, 5 teacher page `<h1>` strips (dashboard / classes / assessments / reports / profile), 3 auth pages (login / signup / forgot).
 
 ### 8.2 — Teacher portal expansion (7 new pages + 7 new endpoints)
 
@@ -131,7 +131,7 @@ User asked: "what should we add to teacher portal based on student/admin functio
 
 **11. Files added/touched (8.2):**
 ```
-NEW (16):
+NEW (21 — 11 route files, 7 pages, 2 services, 1 component):
   src/app/api/teacher/dashboard/route.ts
   src/app/api/teacher/grading/route.ts
   src/app/api/teacher/students/route.ts
@@ -143,16 +143,22 @@ NEW (16):
   src/app/api/teacher/templates/route.ts
   src/app/api/teacher/templates/[id]/route.ts
   src/app/api/teacher/templates/[id]/apply/route.ts
+  src/app/teacher/(portal)/grading/page.tsx
+  src/app/teacher/(portal)/students/page.tsx
+  src/app/teacher/(portal)/analytics/page.tsx
+  src/app/teacher/(portal)/library/page.tsx
+  src/app/teacher/(portal)/templates/page.tsx
+  src/app/teacher/(portal)/notifications/page.tsx
+  src/app/teacher/(portal)/support/page.tsx
   src/components/teacher/teacher-right-sidebar.tsx
   src/server/services/teacher-resources.service.ts
   src/server/services/lesson-templates.service.ts
-  src/app/teacher/(portal)/{grading,students,analytics,library,templates,notifications,support}/page.tsx
 
 MODIFIED:
   src/app/teacher/(portal)/layout.tsx           (right-rail mount on dashboard)
-  src/app/teacher/(portal)/dashboard/page.tsx   (rich layout from /api/teacher/dashboard)
+  src/app/teacher/(portal)/dashboard/page.tsx   (rich layout from /api/teacher/dashboard; dropped unused useCurrentUser import)
   src/components/teacher/teacher-sidenav.tsx    (4 → 11 nav items)
-  src/components/teacher/teacher-topbar.tsx     (titlesFor extended)
+  src/components/teacher/teacher-topbar.tsx     (titlesFor extended for all 7 new routes)
   src/shared/constants/collections.ts           (+ TEACHER_RESOURCES, LESSON_TEMPLATES)
   src/app/api/student/support/route.ts          (role allowlist now ["student","teacher"])
 ```
@@ -287,7 +293,13 @@ All session-6 channels remain. AskAiTab now consumes `HAND_RAISE` and `REACTION`
 
 - `npx tsc --noEmit` → 0 errors (final, plus intermediate checks after each of 8.1, 8.2, 8.3, 8.4, 8.5, 8.6)
 - `next build` not re-run this session
-- Working tree at end of session: ~32 modified + ~16 new tracked files staged for the session 8 commit. Plus pre-existing dirty files from an earlier unlogged attention-tracker exploration (`away-warning-modal.tsx`, `use-attention-tracker.ts`, partial edits to `meetings.service.ts`, `students-pane.tsx`, `student-right-panel.tsx`, `attendance/event/route.ts`, `class-progress/[meetingId]/route.ts`, `student/classroom/[meetingId]/page.tsx`) — included in the same commit since they were going to ship eventually.
+
+### Commit + push
+
+- Single commit: **`a891e01`** "Session 8: design overhaul, teacher portal expansion, teacher-app refactor"
+- 60 files changed, 6 259 insertions, 274 deletions
+- Pushed to `origin/main` (`6e69471..a891e01`) → https://github.com/Huzaifa-Muhammed/edu_meet
+- The commit includes 5 pre-existing dirty files from an earlier unlogged attention-tracker exploration (`away-warning-modal.tsx`, `use-attention-tracker.ts`, partial edits to `meetings.service.ts`, `students-pane.tsx`, `student-right-panel.tsx`, `attendance/event/route.ts`, `class-progress/[meetingId]/route.ts`, `student/classroom/[meetingId]/page.tsx`). They shipped in the same commit because they were going to ship eventually — but they're unfinished. See heads-up #7.
 
 ### Heads-up for next session
 
