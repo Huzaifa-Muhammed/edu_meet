@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,9 +12,15 @@ import {
   Mail,
   Calendar,
   GraduationCap,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import api from "@/lib/api/client";
 import { TeacherCredentials } from "@/components/shared/teacher-credentials";
+import {
+  MonthCalendar,
+  type ScheduleMeeting,
+} from "@/components/shared/month-calendar";
 import type { User } from "@/shared/types/domain";
 
 type DetailResponse = User & {
@@ -236,6 +243,8 @@ export default function AdminUserDetailPage() {
                 </div>
               )}
 
+            {u.role === "teacher" && uid && <TeacherScheduleCard uid={uid} />}
+
             {u.role === "teacher" && u.applicationStatus !== "approved" && (
               <Link
                 href="/admin/applications"
@@ -248,6 +257,90 @@ export default function AdminUserDetailPage() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function TeacherScheduleCard({ uid }: { uid: string }) {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [monthIdx0, setMonthIdx0] = useState(now.getMonth());
+  const monthStr = `${year}-${String(monthIdx0 + 1).padStart(2, "0")}`;
+  const monthLabel = new Date(year, monthIdx0, 1).toLocaleString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+
+  const schedQ = useQuery({
+    queryKey: ["admin", "user", uid, "schedule", monthStr],
+    queryFn: () =>
+      api.get(`/admin/users/${uid}/schedule?month=${monthStr}`) as Promise<{
+        month: string;
+        meetings: ScheduleMeeting[];
+        leaveDates?: string[];
+      }>,
+    enabled: !!uid,
+  });
+
+  function shiftMonth(delta: number) {
+    let m = monthIdx0 + delta;
+    let y = year;
+    if (m < 0) {
+      m = 11;
+      y -= 1;
+    } else if (m > 11) {
+      m = 0;
+      y += 1;
+    }
+    setYear(y);
+    setMonthIdx0(m);
+  }
+
+  const meetings = schedQ.data?.meetings ?? [];
+
+  return (
+    <div className="rounded-2xl border border-bd bg-surf p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-t">
+          <Calendar className="h-4 w-4 text-pt" />
+          Monthly schedule
+        </h2>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => shiftMonth(-1)}
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-bd bg-surf text-t2 hover:bg-panel"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <span className="min-w-[120px] text-center text-xs font-semibold text-t">
+            {monthLabel}
+          </span>
+          <button
+            onClick={() => shiftMonth(1)}
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-bd bg-surf text-t2 hover:bg-panel"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {schedQ.isLoading ? (
+        <div className="h-72 animate-pulse rounded-xl bg-panel" />
+      ) : (
+        <>
+          <MonthCalendar
+            year={year}
+            monthIdx0={monthIdx0}
+            meetings={meetings}
+            leaveDates={schedQ.data?.leaveDates}
+          />
+          {meetings.length === 0 && (
+            <p className="mt-3 text-center text-xs text-t3">
+              No classes scheduled for {monthLabel}.
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }

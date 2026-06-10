@@ -20,6 +20,7 @@ type Overview = {
   students: number;
   blocked: number;
   pendingApplications: number;
+  pendingLeave: number;
   openTickets: number;
   classrooms: number;
 };
@@ -92,6 +93,13 @@ export default function AdminDashboardPage() {
                 title="Review teacher applications"
                 desc="Approve or reject incoming teacher signups."
                 badge={o?.pendingApplications}
+                badgeTone="amber"
+              />
+              <ActionRow
+                href="/admin/leave-requests"
+                title="Review leave requests"
+                desc="Approve or reject teacher leave / absence days."
+                badge={o?.pendingLeave}
                 badgeTone="amber"
               />
               <ActionRow

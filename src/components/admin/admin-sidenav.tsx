@@ -11,6 +11,7 @@ const nav: Item[] = [
   { emoji: "🏠", label: "Dashboard", href: "/admin/dashboard" },
   { emoji: "👥", label: "Users", href: "/admin/users" },
   { emoji: "📨", label: "Applications", href: "/admin/applications" },
+  { emoji: "🌴", label: "Leave requests", href: "/admin/leave-requests" },
   { emoji: "🛟", label: "Reports", href: "/admin/reports" },
 ];
 

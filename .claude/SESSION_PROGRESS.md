@@ -4,7 +4,204 @@
 
 ---
 
-## Last Updated: 2026-05-25 (session 8 — teacher portal redesign + auth split-screen + 7 new teacher pages + teacher-application refactor + Ask-AI grounding)
+## Last Updated: 2026-06-10 (session 9.5 — AI cover-request marketplace: leave → broadcast → first-accept-wins / second-accept-contests → admin decides)
+
+---
+
+## Session 9.5 (2026-06-10) — AI substitute cover-request marketplace
+
+When an approved leave knocks out Teacher A's class, the system now **broadcasts a "take this class" request to every other approved same-subject teacher**. First to accept auto-wins (instant cover for students); a second acceptor flips the request to **contested** → admin chooses. Coexists with the manual admin cover from 9.4 (which still works).
+
+### Design decision
+True microsecond-simultaneous accepts can't be detected on a serverless backend, so: **first accept auto-assigns** (via a Firestore transaction), **any later accept → `contested`** → admin picks. Faithfully delivers "one accepts → assigned; two want it → admin decides."
+
+### Data model — new `coverRequests` collection (`Collections.COVER_REQUESTS`)
+- Doc id = **`${leaveId}_${meetingId}`** (deterministic → broadcast is idempotent, acceptances survive re-runs).
+- `CoverRequest` type (domain.ts): `{ meetingId, leaveId, originalTeacherId, originalTeacherName, subjectName, classTitle, scheduledDate, scheduledTime, durationMin, status: "open"|"assigned"|"contested"|"cancelled", acceptances: [{teacherId, teacherName, acceptedAt}], assignedTeacherId, assignedTeacherName, resolvedAt, resolvedBy ("auto"|adminUid), createdAt }`.
+
+### Service — `src/server/services/cover.service.ts` (new)
+- `teacherSubjects(userDoc)` — exported helper, union of `subjects` + `applicationSubject` + `extraData.specializations` (normalized). Same logic as the admin coverage route.
+- `broadcastForLeave(leave)` — finds meetings on the leave dates (owned by teacher, not ended, not proposed), creates one open cover request each (subject fallback to classroom when the meeting carries no `subjectName`). Idempotent via doc id.
+- `listForTeacher(teacherId)` — all relevant cover requests + a per-viewer **`myState`**: `open` (subject-matched & grabbable) / `accepted` (contested, waiting on admin) / `won` (assigned to me) / `lost` (assigned to a rival). Excludes the teacher's own class.
+- `accept(coverId, teacher)` — **Firestore transaction**. Authorizes by subject. open → assign + reassign meeting in the same txn (`resolvedBy:"auto"`); assigned/contested → add acceptance + flip to `contested`. Returns `{ outcome: "assigned"|"contested"|"cancelled" }`.
+- `listForAdmin(status?)` · `countContested()` · `resolve(coverId, adminUid, teacherId)` — admin picks one accepting teacher; transaction sets `assigned` + reassigns the meeting.
+- Meeting reassignment is inlined in the transactions (preserving `originalTeacherId`), mirroring `meetingsService.reassignTeacher`.
+
+### Endpoints (4 new + 1 hook)
+- `GET /api/teacher/cover-requests` · `POST /api/teacher/cover-requests/[id]/accept`
+- `GET /api/admin/cover-requests?status=` · `POST /api/admin/cover-requests/[id]/resolve` `{ teacherId }`
+- **Hook:** `PATCH /api/admin/leave-requests/[id]` — on `status:"approved"`, calls `coverService.broadcastForLeave` and returns `coverRequestsBroadcast` count.
+
+### Frontend
+- **`cover-request-popup.tsx`** (new) — floating bottom-right popup, mounted globally in `teacher/(portal)/layout.tsx`, polls every 30s, shows the soonest open request with **Accept** + "View all". Dismissals tracked in `localStorage` (`edumeet:cover-dismissed`).
+- **`cover-requests-panel.tsx`** (new) — section on the **teacher Schedule page** (above the tabs) listing all relevant requests with state pills (Accept / You're covering this / Awaiting admin decision / Assigned to X).
+- **Admin leave-requests page** — new **`ContestedCoverPanel`** at the top: per-contested-request, one "Assign <teacher>" button per acceptor. Polls every 30s.
+
+### Build status
+- `npx tsc --noEmit` → **0 errors**. No new deps. New collection `coverRequests` (no composite index — all single-equality queries + in-memory filter).
+
+### Heads-up
+1. **Broadcast fires on leave approval.** Re-approving (idempotent) won't duplicate requests. Rejecting/un-approving does **not** cancel already-broadcast requests — no auto-cancel yet.
+2. **Popup dismissal is client-side localStorage** (per-browser, per-request id), not server "seen" state — same pragmatic choice as elsewhere. The Schedule-page panel always shows everything regardless of dismissal.
+3. **First-accept auto-assign keeps the class covered** even while a contest is pending; admin's choice can move it to the second teacher. No notification to students/teacher beyond the class appearing on the new teacher's schedule.
+4. **Subject match** uses the same union as candidates (`subjects` + `applicationSubject` + `extraData.specializations`). A teacher with no recognizable subjects sees nothing to accept.
+5. Manual admin cover (9.4) and this marketplace both reassign the same meeting field — last write wins; they're complementary, not mutually exclusive.
+
+---
+
+## Session 9.4 (2026-06-09) — Student new-schedule popup · end-of-class recap · emergency leave + substitute cover
+
+Completed the remaining items from a 6-point checklist (1/2/5 were already done in 9.1–9.3). No new Firestore collections.
+
+### #3 — "New schedule ready" dashboard popup (students)
+
+- `scheduleService.approve` now stamps **`approvedAt`** on each approved meeting.
+- `/api/student/live-classes` reads the student's `scheduleSeenAt` (on the user doc) and returns `newSchedule: { available, at, subjects }` — true when any relevant upcoming class was approved **after** the student last looked.
+- `POST /api/student/schedule-seen` sets `users/{uid}.scheduleSeenAt = now`.
+- Student dashboard shows a **popup** ("New schedule is ready … for *Subject*") with "View schedule →" (scrolls to the `#my-schedule` section + marks seen) / "Later" (marks seen). Audience = enrolled + subject-interest (same as the calendar).
+
+### #4 — End-of-class recap popup + PDF (students)
+
+- `GET /api/student/class-recap/[meetingId]` — read-only aggregation (authorizes via enrolled/subject-match): **agenda** (+ topics covered = done items), **teacher/admin notes**, **answered/AI-answered questions** (`aiAnswer`), teacher name, date. No new collection.
+- Student classroom page now **polls** `meetingQ` (`refetchInterval: 8s`) and the `status==="ended"` check moved **above** the token branch so it always wins. On end it renders **`ClassRecapScreen`** (`src/components/student/class-recap.tsx`) instead of the old static "class ended" screen.
+- **PDF = dependency-free**: "Download PDF" opens a styled print window and calls `window.print()` (Save as PDF). No generator lib was available (`pdfjs-dist` is a reader).
+
+### #6 — Emergency leave + admin substitute reassignment
+
+- `LeaveRequest.emergency` — auto-set in `leaveService.create` when the leave **starts within ~48h**. Admin leave page shows a red **Emergency** badge + warning line and **sorts emergency-pending to the top**.
+- **Meeting reassignment**: `meetingsService.reassignTeacher(meetingId, newTeacherId, byUid)` swaps `teacherId`, preserving `originalTeacherId` (+ `substituteTeacherId`/`reassignedAt`/`reassignedBy`). The substitute sees the class on their own schedule automatically; students see the new teacher (live-classes resolves teacher from `meeting.teacherId`).
+- `GET /api/admin/leave-requests/[id]/coverage` — affected classes on the leave dates (queries both `teacherId==` and `originalTeacherId==` so already-covered ones still show) + candidate teachers (**same-subject first**, approved only). `POST …/[id]/assign { meetingId, teacherId }` reassigns one class.
+- Admin leave card has an **"Assign cover for these dates"** panel: per-class teacher dropdown + Assign, showing "→ covered by X".
+
+### Status of the 6-point checklist
+
+1 ✅ weekly AI schedule · 2 ✅ teacher approval on calendar · 3 ✅ student dashboard popup + calendar · 4 ✅ class recap + PDF · 5 ✅ leave apply + availability · 6 ✅ emergency auto-flag + admin manual cover reassignment.
+
+### Build status
+
+- `npx tsc --noEmit` → **0 errors**. No new collections, no new deps, no composite indexes.
+
+### Heads-up
+
+1. **Recap "PDF" is print-to-PDF** (browser Save-as-PDF). If a true server-side `.pdf` download is wanted, add a generator (e.g. `pdfkit`) + a route.
+2. **Reassignment is per-class & manual** (admin picks). No auto-assign and no notification to the substitute/students beyond the class appearing on their schedule with the new teacher.
+3. **`scheduleSeenAt`** is a single timestamp — the popup is "new since last seen," not per-class. Dismissing marks everything seen.
+4. **Emergency = starts ≤48h** (covers the "24–48 hours" rule). Admin "notification" = the badge/sort + dashboard pending count; there's no admin bell.
+5. Class recap pulls **all** of a classroom's agenda/notes (not strictly this one meeting's), since agenda/notes are classroom-scoped — fine for recurring classes, but a long-running classroom accumulates them.
+
+---
+
+## Session 9.3 (2026-06-09) — Calendar readability fix + teacher leave requests
+
+### Calendar color fix (white-on-white)
+
+`globals.css` uses **`@theme inline`** (line 68), which means Tailwind v4 **does NOT emit the `--color-*` custom properties** — they're inlined into utilities at build. My session-9 inline styles used `var(--color-surf)` / `var(--color-panel)` / `var(--color-acc)` etc., which resolved to **undefined** → transparent/white boxes under white text. **Fix:** use the raw scope vars (`var(--surf)`, `var(--panel)`, `var(--acc)`, `var(--accbg)`, `var(--bd)`) which *are* emitted by `:root`/`.teacher-ui`/`.admin-ui` and flip per scope. Replaced across `month-calendar.tsx`, `availability-editor.tsx`, `schedule/page.tsx`. **Rule: in inline `style={}`, never use `var(--color-*)` — use the raw `var(--token)`.** Utilities like `bg-surf`/`text-t` are fine (they reference the raw vars).
+
+### Teacher leave requests
+
+- **New `leaveRequests` collection** + `LeaveRequest` type: `{ teacherId, teacherName, teacherEmail, startDate, endDate, reason, status: pending|approved|rejected, createdAt, reviewedAt, reviewedBy, reviewNote }`. Schema `leave.schema.ts` (`LeaveCreateSchema` start/optional-end/reason, `LeaveReviewSchema`).
+- **`leaveService`** — `create`, `listForTeacher`, `listAll(status?)`, `countPending`, `review`, and **`approvedLeaveDates(teacherId, prefix?)`** → `Set<YYYY-MM-DD>` expanded from approved ranges.
+- **Endpoints:** `GET/POST /api/teacher/leave` (apply + list own); `GET /api/admin/leave-requests` (+`?status=`); `PATCH /api/admin/leave-requests/[id]` (approve/reject + note).
+- **Teacher UI:** "Leave" button on the Schedule toolbar → `LeaveModal` (from/to dates + reason form + list of own requests w/ status pills). Approved leave days render **red "Leave"** cells in `MonthCalendar` (new optional `leaveDates` prop, used on teacher + admin calendars).
+- **Admin UI:** new **`/admin/leave-requests`** page (mirrors the applications list: status filter + count badges + Approve/Reject-with-note cards). Sidenav 🌴 item + topbar title added. Overview gains `pendingLeave` count + a dashboard Quick-action row.
+- **Scheduler integration:** `scheduleService.generate` now **skips approved-leave dates** when expanding the weekly pattern (calls `leaveService.approvedLeaveDates`). Note: approving leave does **not** retroactively cancel already-scheduled classes on those days — future enhancement.
+
+### Build status
+
+- `npx tsc --noEmit` → **0 errors** (a transient `.next/dev/types/validator.ts` corruption from the dev server regenerating mid-edit was deleted; it regenerates on next build). No composite indexes. No new deps.
+
+---
+
+## Session 9.2 (2026-06-09) — Schedule approval workflow + weekly auto-propose + student propagation + cross-teacher conflict avoidance
+
+Extension of session 9. Four asks (all confirmed via `AskUserQuestion`, recommended options): AI **auto-proposes every week**, teacher **approves** before anything publishes, approved schedule **propagates to subject-matched students**, and **two teachers of the same subject never collide** on a time slot.
+
+### Approval model (proposed → approved)
+
+- **`Meeting.scheduleStatus: "proposed" | "approved"`** (optional; absent = approved, so manual/legacy meetings are unaffected). AI `generate` now writes meetings as **`proposed`**.
+- **Proposed meetings are teacher-only.** Gated out of: `/api/student/live-classes` (skip `status==scheduled && scheduleStatus==proposed`), the teacher dashboard (new `visibleMeetings` filter drives liveNow/nextUp/today/week-strip + stats), and the admin schedule view. They render **only** on the teacher's own Schedule page, **dashed/ghosted** in `MonthCalendar`.
+- **Approve = publish.** `POST /api/teacher/schedule/approve` flips the teacher's proposed batch → approved (then visible on dashboard + to students). **Discard** (`/discard`) deletes the batch. **Approve-all-at-once** per the chosen UX.
+
+### Weekly cadence + lazy auto-propose
+
+- Generation is now **week-scoped** (Mon–Sun). `generate({ weekStart? })` targets an explicit week or the **soonest empty upcoming week** (`soonestEmptyWeek`, 6-week look-ahead). Returns `reason: "ok" | "no-classrooms" | "already-scheduled"`.
+- **`autoProposeIfNeeded(teacherId)`** — called lazily from both the **Schedule GET and Dashboard GET**. If auto isn't disabled, there's no pending proposal, and the soonest-empty week differs from `lastAutoWeek` (stored on the `teacherAvailability` doc, so a discard isn't instantly undone), it generates a proposal. One pending proposal at a time.
+- `getPendingProposal` returns `{ weekStart, weekEnd, count }` → drives the **Schedule-page banner** (Approve / Regenerate / Discard / "View on calendar") and the **Dashboard nudge** ("AI proposed N classes for week of … — Review →"). This is the "AI sends the teacher to the schedule" mechanism.
+
+### Cross-teacher same-subject conflict avoidance
+
+- `gatherOccupiedBySubject(teacherId, classrooms)` queries `meetings where subjectName in [teacher's subjects]` (single-field `in`, chunked by 30, **no composite index**), keeps **other teachers' approved** classes, and builds `Map<normSubject, {day,start,end}[]>` weekly occupied slots.
+- `sanitizeTimetable` + `fallbackTimetable` now drop any candidate slot overlapping an occupied same-subject slot (plus the existing availability-block + self-overlap checks). `approve` **re-checks** each proposed class against approved same-subject others and **skips (deletes) clashers**, reporting `skipped`.
+
+### Student propagation
+
+- Already wired: `/api/student/live-classes` routes a classroom's meetings to students **enrolled OR subject-interest-matched** (`user.subjects`). The only change needed was the **proposed-gate** — so once a teacher approves, subject-matched students see the classes in their dashboard "My Schedule" / "Next up" automatically. No new student UI.
+
+### Endpoints (this iteration)
+
+- `POST /api/teacher/schedule/generate` — body `{ weekStart?, sessionsPerWeek? }` (was month-based; now weekly, writes proposed).
+- `POST /api/teacher/schedule/approve` · `POST /api/teacher/schedule/discard` (new).
+- `GET /api/teacher/schedule` — now also auto-proposes + returns `pendingProposal`.
+- `GET /api/teacher/dashboard` — auto-proposes, gates proposed, returns `pendingProposal`.
+- `GET /api/student/live-classes` — gates proposed.
+- `GET /api/admin/users/[uid]/schedule` — filters proposed out.
+
+### Build status
+
+- `npx tsc --noEmit` → **0 errors**. No composite indexes. No new deps.
+
+### Heads-up
+
+1. **Auto-propose runs on every dashboard/schedule GET** (dashboard polls every 30s). Steady-state it's a cheap early-return (a few reads) once a proposal is pending, but for scale move it to a real weekly cron (`/api/cron/...` guarded by a secret) and drop the lazy hooks.
+2. **Conflict avoidance is best-effort.** It only blocks against *approved* same-subject classes that carry a `subjectName` (all AI ones do; manually-created meetings may not). Two teachers approving near-simultaneously can still race past the check.
+3. **`lastAutoWeek`** on the `teacherAvailability` doc prevents re-proposing a discarded week until the calendar rolls forward. No per-teacher "disable auto" toggle UI yet (the `autoProposeEnabled:false` field is honored if set manually).
+4. Manual `generate` button is **hidden while a proposal is pending** (use the banner's Regenerate) to keep it to one pending proposal.
+
+---
+
+## Session 9 (2026-06-09) — AI-driven scheduling (availability + month calendar + admin view)
+
+User asked for an AI scheduling system: teachers set weekly availability, AI auto-creates a month of classes from their existing classrooms (detecting subject per class) around that availability, the Classes page becomes a Google-Calendar-style month **Schedule** page, the dashboard week strip shows real class times + subjects, and admins can view any teacher's monthly schedule. Confirmed 4 decisions up-front via `AskUserQuestion`: **existing classrooms** as the AI source · **auto-create directly** (no preview gate) · **hourly 8am–10pm availability grid** · **current calendar month** horizon.
+
+### Data model
+
+- **New collection `teacherAvailability`** (`Collections.TEACHER_AVAILABILITY`), doc id = teacherId: `{ teacherId, timezone, blocks: [{ day:0–6 Mon=0, start:"HH:MM", end:"HH:MM" }], updatedAt }`. Default = fully available; teacher stores **unavailable** windows. AI never schedules inside a block.
+- **Extended `Meeting`** (domain.ts) with optional `scheduledDate` ("YYYY-MM-DD"), `scheduledTime` ("HH:MM"), `durationMin`, `subjectName`, `title`, `source: "manual"|"ai"`. All optional → backward-compatible. **Key design:** the explicit wall-clock `scheduledDate`/`scheduledTime` strings are **timezone-stable for display** (every new display surface reads them directly, never `new Date(startedAt)` which shifts by viewer TZ). `startedAt` is still populated as `${date}T${time}:00.000Z` so existing ordering/date-grouping keeps working.
+
+### Service — `src/server/services/schedule.service.ts` (new)
+
+- `getAvailability` / `saveAvailability` — read/write the availability doc (normalises out zero-length windows).
+- `listMonth(teacherId, year, monthIdx0)` — fetches teacher's meetings (single `where teacherId==`, **no composite index**) + classrooms, hydrates each row with classroomName/subjectName/time/duration, filters to the month in-memory.
+- `clearMonth` — deletes future `source:"ai" && status:"scheduled"` meetings in the month (in-memory filter, batched).
+- `generate(teacherId,{year,monthIdx0,sessionsPerWeek?})` — the core. (1) loads classrooms (returns `no-classrooms` if none), (2) loads availability, (3) asks Groq (`llama-3.3-70b-versatile`, temp 0.3, JSON-by-prompt) for a **weekly timetable** `[{classroomId,day,startTime,durationMin}]`, (4) `sanitizeTimetable` validates server-side: classroomId must exist, day 0–6, start snapped to :30 and clamped 08:00–21:00, duration ∈ {30,45,60,90}, end ≤ 22:00, **drops slots overlapping any availability block**, de-conflicts overlaps, (5) if AI yields nothing → **deterministic `fallbackTimetable`** (round-robin Mon–Fri 09:00–17:00, staggered per classroom, respects blocks), (6) clears prior AI month, (7) expands the weekly pattern across the month's future dates into `meetings` (status scheduled, source ai, videosdkRoomId null → lazy-allocated on join), batched ≤450/commit. **AI only proposes; server enforces all hard constraints.**
+
+### Endpoints (4 new)
+
+- `GET/PUT /api/teacher/availability`
+- `GET /api/teacher/schedule?month=YYYY-MM` (meetings + availability) · `DELETE` (clear AI month)
+- `POST /api/teacher/schedule/generate` `{ month, sessionsPerWeek? }`
+- `GET /api/admin/users/[uid]/schedule?month=YYYY-MM` (admin-only, read-only)
+
+### Frontend
+
+- **`src/components/shared/month-calendar.tsx`** (new) — presentational Google-Calendar-style month grid with **rounded day cells**, Mon–Sun header, today highlight via accent, past-day dimming, per-day class chips (time + subject, status-coloured dot), "+N more". Built with **semantic tokens** (`bg-surf/bg-panel/border-bd/text-t/bg-acc`) so it adapts to both the dark `.teacher-ui` (amber) and the admin scope (blue). Reused read-only in admin.
+- **`src/components/teacher/availability-editor.tsx`** (new) — weekly hourly grid 8am–10pm × Mon–Sun, **click-and-drag paint** to block/unblock, Clear + Save, legend. Converts contiguous blocked hours ↔ `AvailabilityBlock` ranges.
+- **`src/app/teacher/(portal)/schedule/page.tsx`** (new) — replaces Classes. Month nav, **Generate with AI** / Clear / New Class toolbar, Calendar ⇄ Availability tabs, live-now banner, class-detail modal (open/start class), reuses `CreateClassForm`. Old `/teacher/classes` page → redirect to `/teacher/schedule`.
+- **Sidenav** Classes (📚) → **Schedule (📅)** `/teacher/schedule`; **topbar** title mapping updated (handles both paths).
+- **Dashboard** (`/api/teacher/dashboard` + page) — schedule entries now carry `subjectName`/`scheduledTime`/`durationMin`; week-strip **day boxes show class chips** (time + subject, live=red/scheduled=amber) instead of a bare dot; `ClassRow` shows subject + tz-stable time; added "Full schedule →" link. All `/teacher/classes` links repointed to `/teacher/schedule`.
+- **Admin** (`/admin/users/[uid]`) — new **read-only "Monthly schedule" card** for teachers with month nav + `MonthCalendar`.
+
+### Build status
+
+- `npx tsc --noEmit` → **0 errors**. `next build` not re-run. **No composite indexes required** (all queries single-equality + in-memory filter). No new deps.
+
+### Heads-up for next session
+
+1. **Timezone is pragmatic, not rigorous.** Availability + generated times use the teacher's local wall clock; `scheduledDate`/`scheduledTime` strings are stored as-entered and displayed verbatim (tz-stable). `startedAt` is `…Z`-suffixed for ordering only — do **not** render class times from `startedAt` via `new Date()` (it shifts). The captured `availability.timezone` is stored but not yet used for cross-tz conversion.
+2. **Generation ignores existing manual meetings** when placing AI slots (no cross-check for clashes with manually-created classes). Add an overlap check vs non-ai meetings if double-booking becomes an issue.
+3. **AI source = existing classrooms only.** Teachers with zero classrooms get a toast to create one first (`reason: "no-classrooms"`). Subject is read from `classroom.subjectName`.
+4. **Regenerate replaces.** `generate` clears that month's future AI meetings first; manually-created meetings and past/live meetings are never touched.
+5. **`durationMin` is informational** — meetings still end when the teacher ends them; no auto-end at `start+duration`.
 
 ---
 

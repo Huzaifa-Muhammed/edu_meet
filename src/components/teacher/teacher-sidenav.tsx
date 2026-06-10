@@ -9,7 +9,7 @@ type Item = { emoji: string; label: string; href: string };
 
 const nav: Item[] = [
   { emoji: "🏠", label: "Dashboard", href: "/teacher/dashboard" },
-  { emoji: "📚", label: "Classes", href: "/teacher/classes" },
+  { emoji: "📅", label: "Schedule", href: "/teacher/schedule" },
   { emoji: "📋", label: "Assessments", href: "/teacher/assessments" },
   { emoji: "✍️", label: "Grading", href: "/teacher/grading" },
   { emoji: "👥", label: "Students", href: "/teacher/students" },

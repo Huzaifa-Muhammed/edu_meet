@@ -5,6 +5,7 @@ import { verifyToken } from "@/server/auth/verify-token";
 import { requireRole } from "@/server/auth/require-role";
 import { adminDb } from "@/server/firebase-admin";
 import { Collections } from "@/shared/constants/collections";
+import { scheduleService } from "@/server/services/schedule.service";
 import { ok, fail } from "@/server/utils/response";
 
 type ActivityItem = {
@@ -42,17 +43,27 @@ type DashboardResp = {
     classes: Array<{
       id: string;
       classroomName: string;
+      subjectName?: string;
       startedAt?: string;
+      scheduledTime?: string;
+      durationMin?: number;
       status: string;
     }>;
   }>;
   activity: ActivityItem[];
+  pendingProposal: { weekStart: string; weekEnd: string; count: number } | null;
 };
 
 export async function GET(req: NextRequest) {
   try {
     const user = await verifyToken(req);
     requireRole(user, ["teacher"]);
+
+    // Proactively ensure the AI has proposed the soonest empty week, so the
+    // "review your schedule" nudge surfaces here without visiting Schedule first.
+    await scheduleService.autoProposeIfNeeded(user.uid).catch((e) => {
+      console.warn("[dashboard] auto-propose failed:", e);
+    });
 
     // Teacher's classrooms
     const classroomsSnap = await adminDb
@@ -61,9 +72,12 @@ export async function GET(req: NextRequest) {
       .get();
     const classrooms = classroomsSnap.docs.map((d) => ({
       id: d.id,
-      ...(d.data() as { name: string; studentIds?: string[] }),
+      ...(d.data() as { name: string; studentIds?: string[]; subjectName?: string }),
     }));
     const classroomNameById = new Map(classrooms.map((c) => [c.id, c.name]));
+    const classroomSubjectById = new Map(
+      classrooms.map((c) => [c.id, c.subjectName ?? ""]),
+    );
     const allStudents = new Set<string>();
     for (const c of classrooms) (c.studentIds ?? []).forEach((s) => allStudents.add(s));
 
@@ -77,12 +91,21 @@ export async function GET(req: NextRequest) {
       ...(d.data() as {
         classroomId: string;
         status: string;
+        scheduleStatus?: string;
         startedAt?: string;
+        scheduledDate?: string;
+        scheduledTime?: string;
+        subjectName?: string;
+        durationMin?: number;
         participantIds?: string[];
       }),
     }));
 
-    const live = meetings.find((m) => m.status === "live") ?? null;
+    // Unapproved AI proposals stay off the dashboard (and out of stats) until
+    // the teacher approves them on the Schedule page.
+    const visibleMeetings = meetings.filter((m) => m.scheduleStatus !== "proposed");
+
+    const live = visibleMeetings.find((m) => m.status === "live") ?? null;
     const liveNow = live
       ? {
           id: live.id,
@@ -93,7 +116,7 @@ export async function GET(req: NextRequest) {
         }
       : null;
 
-    const scheduled = meetings
+    const scheduled = visibleMeetings
       .filter((m) => m.status === "scheduled" && m.startedAt)
       .sort((a, b) => (a.startedAt ?? "").localeCompare(b.startedAt ?? ""));
     const next = scheduled[0];
@@ -108,8 +131,8 @@ export async function GET(req: NextRequest) {
 
     // Stats
     const todayStr = new Date().toISOString().slice(0, 10);
-    const todayClasses = meetings.filter(
-      (m) => m.startedAt?.slice(0, 10) === todayStr,
+    const todayClasses = visibleMeetings.filter(
+      (m) => (m.scheduledDate ?? m.startedAt?.slice(0, 10)) === todayStr,
     ).length;
 
     // Assessments + submissions for pending grades + score
@@ -228,16 +251,25 @@ export async function GET(req: NextRequest) {
       const d = new Date(weekStart);
       d.setDate(weekStart.getDate() + i);
       const isoDate = d.toISOString().slice(0, 10);
-      const classes = meetings
-        .filter((m) => m.startedAt?.slice(0, 10) === isoDate)
+      const classes = visibleMeetings
+        .filter(
+          (m) =>
+            (m.scheduledDate ?? m.startedAt?.slice(0, 10)) === isoDate,
+        )
         .map((m) => ({
           id: m.id,
           classroomName: classroomNameById.get(m.classroomId) ?? "Class",
+          subjectName: m.subjectName ?? classroomSubjectById.get(m.classroomId) ?? "",
           startedAt: m.startedAt,
+          scheduledTime: m.scheduledTime ?? m.startedAt?.slice(11, 16),
+          durationMin: m.durationMin ?? 60,
           status: m.status,
-        }));
+        }))
+        .sort((a, b) => (a.scheduledTime ?? "").localeCompare(b.scheduledTime ?? ""));
       return { date: isoDate, classes };
     });
+
+    const pendingProposal = await scheduleService.getPendingProposal(user.uid);
 
     const resp: DashboardResp = {
       liveNow,
@@ -251,6 +283,7 @@ export async function GET(req: NextRequest) {
       },
       schedule,
       activity,
+      pendingProposal,
     };
     return ok(resp);
   } catch (e) {

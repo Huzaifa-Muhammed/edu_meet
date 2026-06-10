@@ -5,6 +5,7 @@ import { verifyToken } from "@/server/auth/verify-token";
 import { requireRole } from "@/server/auth/require-role";
 import { adminDb } from "@/server/firebase-admin";
 import { Collections } from "@/shared/constants/collections";
+import { leaveService } from "@/server/services/leave.service";
 import { ok, fail } from "@/server/utils/response";
 
 export async function GET(req: NextRequest) {
@@ -39,12 +40,15 @@ export async function GET(req: NextRequest) {
       .collection(Collections.CLASSROOMS)
       .get();
 
+    const pendingLeave = await leaveService.countPending();
+
     return ok({
       totalUsers: usersSnap.size,
       teachers,
       students,
       blocked,
       pendingApplications: pendingApps,
+      pendingLeave,
       openTickets: openTicketsSnap.size,
       classrooms: classroomsSnap.size,
     });

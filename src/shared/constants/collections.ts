@@ -38,4 +38,7 @@ export const Collections = {
   EMAIL_LOG: "emailLog",
   TEACHER_RESOURCES: "teacherResources",
   LESSON_TEMPLATES: "lessonTemplates",
+  TEACHER_AVAILABILITY: "teacherAvailability",
+  LEAVE_REQUESTS: "leaveRequests",
+  COVER_REQUESTS: "coverRequests",
 } as const;

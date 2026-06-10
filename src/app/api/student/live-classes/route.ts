@@ -22,6 +22,8 @@ type Meeting = {
   id: string;
   classroomId: string;
   status: string;
+  scheduleStatus?: string;
+  approvedAt?: string;
   startedAt?: string;
   teacherId: string;
   videosdkRoomId?: string | null;
@@ -49,6 +51,7 @@ export async function GET(req: NextRequest) {
       normalize,
     );
     const subjectsSet = new Set(subjects);
+    const scheduleSeenAt = (userDoc.data()?.scheduleSeenAt as string | undefined) ?? "";
 
     const subjSnap = await adminDb.collection(Collections.SUBJECTS).get();
     const subjectNameById = new Map<string, string>();
@@ -78,7 +81,12 @@ export async function GET(req: NextRequest) {
         subjectName: resolveSubjectName(c.subjectId, c.subjectName, subjectNameById),
       }));
     const relevantIds = new Set(relevant.map((c) => c.id));
-    if (relevantIds.size === 0) return ok({ live: [], upcoming: [] });
+    if (relevantIds.size === 0)
+      return ok({
+        live: [],
+        upcoming: [],
+        newSchedule: { available: false, at: "", subjects: [] },
+      });
 
     // Meetings that are live OR scheduled. Firestore "in" maxes out at 10 ids,
     // so we do an in-memory filter.
@@ -98,6 +106,8 @@ export async function GET(req: NextRequest) {
     for (const d of meetingsSnap.docs) {
       const m = { id: d.id, ...(d.data() as Omit<Meeting, "id">) };
       if (!relevantIds.has(m.classroomId)) continue;
+      // Unapproved AI proposals are teacher-only — never surfaced to students.
+      if (m.status === "scheduled" && m.scheduleStatus === "proposed") continue;
       const classroom = relevant.find((c) => c.id === m.classroomId)!;
       teacherIds.add(m.teacherId);
       const enriched = {
@@ -109,6 +119,22 @@ export async function GET(req: NextRequest) {
       if (m.status === "live") live.push(enriched);
       else upcoming.push(enriched);
     }
+
+    // "New schedule ready" signal: any newly-approved upcoming class (in the
+    // student's subjects / enrolled) approved after they last looked.
+    let newestApprovedAt = "";
+    const newSubjects = new Set<string>();
+    for (const m of upcoming) {
+      const approvedAt = m.approvedAt;
+      if (!approvedAt || approvedAt <= scheduleSeenAt) continue;
+      if (approvedAt > newestApprovedAt) newestApprovedAt = approvedAt;
+      if (m.classroom.subjectName) newSubjects.add(m.classroom.subjectName);
+    }
+    const newSchedule = {
+      available: !!newestApprovedAt,
+      at: newestApprovedAt,
+      subjects: Array.from(newSubjects),
+    };
 
     // Fetch teachers in parallel
     const teacherMap = new Map<string, Teacher>();
@@ -126,7 +152,7 @@ export async function GET(req: NextRequest) {
     live.sort((a, b) => (b.startedAt ?? "").localeCompare(a.startedAt ?? ""));
     upcoming.sort((a, b) => (a.startedAt ?? "").localeCompare(b.startedAt ?? ""));
 
-    return ok({ live, upcoming });
+    return ok({ live, upcoming, newSchedule });
   } catch (e) {
     return fail(e);
   }

@@ -14,6 +14,7 @@ import { StudentLeftPanel } from "@/components/student/classroom/student-left-pa
 import { StudentRightPanel } from "@/components/student/classroom/student-right-panel";
 import { StudentMainArea } from "@/components/student/classroom/student-main-area";
 import { AwayWarningModal } from "@/components/student/classroom/away-warning-modal";
+import { ClassRecapScreen } from "@/components/student/class-recap";
 import { useAttentionTracker } from "@/hooks/use-attention-tracker";
 import { useAuth } from "@/providers/auth-provider";
 
@@ -46,6 +47,9 @@ export default function StudentClassroomPage() {
     queryKey: ["meeting", meetingId],
     queryFn: () => api.get(`/meetings/${meetingId}`) as unknown as Promise<Meeting>,
     enabled: !!meetingId,
+    // Poll so a student in the live class detects the teacher ending it and
+    // gets the recap without a manual refresh.
+    refetchInterval: 8_000,
   });
 
   const tokenQ = useQuery<TokenResponse>({
@@ -94,6 +98,17 @@ export default function StudentClassroomPage() {
     );
   }
 
+  // Checked before the token branch so a class that ended always shows the
+  // recap (regardless of token state).
+  if (meetingQ.data?.status === "ended") {
+    return (
+      <ClassRecapScreen
+        meetingId={meetingId}
+        onBack={() => router.push("/student/dashboard")}
+      />
+    );
+  }
+
   if (tokenQ.error || !tokenQ.data) {
     const msg = (tokenQ.error as Error | undefined)?.message ?? "Token unavailable";
     const isBanned = /removed from this class/i.test(msg);
@@ -113,20 +128,6 @@ export default function StudentClassroomPage() {
         <button
           onClick={() => router.push("/student/dashboard")}
           className="mt-3 rounded-lg border border-white/20 px-4 py-1.5 text-xs hover:bg-white/10"
-        >
-          Back to dashboard
-        </button>
-      </div>
-    );
-  }
-
-  if (meetingQ.data?.status === "ended") {
-    return (
-      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-black p-6 text-center text-white/70">
-        <p className="text-sm">This class has ended.</p>
-        <button
-          onClick={() => router.push("/student/dashboard")}
-          className="rounded-lg bg-white/10 px-4 py-1.5 text-xs text-white hover:bg-white/20"
         >
           Back to dashboard
         </button>

@@ -8,10 +8,10 @@ import { signOut } from "@/lib/api/auth";
 import { ChevronDown, GraduationCap, LogOut, User as UserIcon } from "lucide-react";
 
 function titlesFor(pathname: string, firstName: string): { title: string; sub: string } {
-  if (pathname.startsWith("/teacher/classes"))
+  if (pathname.startsWith("/teacher/schedule") || pathname.startsWith("/teacher/classes"))
     return {
-      title: "Live & Scheduled Classes",
-      sub: "Start a class or jump back into a live one",
+      title: "Schedule",
+      sub: "Your monthly calendar — AI plans classes around your availability",
     };
   if (pathname.startsWith("/teacher/assessments"))
     return { title: "Assessments", sub: "Quizzes, tests and graded work" };

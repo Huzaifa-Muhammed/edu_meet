@@ -22,7 +22,12 @@ type MeetingCard = {
   teacher: { displayName?: string } | null;
 };
 
-type LiveClassesResponse = { live: MeetingCard[]; upcoming: MeetingCard[] };
+type NewSchedule = { available: boolean; at: string; subjects: string[] };
+type LiveClassesResponse = {
+  live: MeetingCard[];
+  upcoming: MeetingCard[];
+  newSchedule?: NewSchedule;
+};
 
 type StudentAssessment = {
   id: string;
@@ -55,6 +60,7 @@ export default function StudentDashboardPage() {
   const qc = useQueryClient();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [askedOnce, setAskedOnce] = useState(false);
+  const [scheduleDismissed, setScheduleDismissed] = useState(false);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -117,6 +123,24 @@ export default function StudentDashboardPage() {
     },
     onError: (err: Error) => toast.error(err.message),
   });
+
+  const seenMut = useMutation({
+    mutationFn: () => api.post("/student/schedule-seen", {}) as Promise<unknown>,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["student", "live-classes"] }),
+  });
+
+  const newSchedule = liveQ.data?.newSchedule;
+  const showScheduleModal = !!newSchedule?.available && !scheduleDismissed;
+
+  function dismissSchedule(scroll: boolean) {
+    setScheduleDismissed(true);
+    seenMut.mutate();
+    if (scroll) {
+      document
+        .getElementById("my-schedule")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
 
   const liveList = liveQ.data?.live ?? [];
   const upcomingList = liveQ.data?.upcoming ?? [];
@@ -250,16 +274,52 @@ export default function StudentDashboardPage() {
         </div>
 
         {/* Schedule */}
-        <ScheduleSection
-          live={liveList}
-          upcoming={upcomingList}
-          onJoin={(m) => {
-            if (m.enrolled) return;
-            const code = m.classroom.code ?? prompt("Enter class code:") ?? "";
-            if (code) enrollMut.mutate({ classroomId: m.classroomId, code });
-          }}
-        />
+        <div id="my-schedule" className="scroll-mt-4">
+          <ScheduleSection
+            live={liveList}
+            upcoming={upcomingList}
+            onJoin={(m) => {
+              if (m.enrolled) return;
+              const code = m.classroom.code ?? prompt("Enter class code:") ?? "";
+              if (code) enrollMut.mutate({ classroomId: m.classroomId, code });
+            }}
+          />
+        </div>
       </div>
+
+      <Modal
+        open={showScheduleModal}
+        onClose={() => dismissSchedule(false)}
+        title="🗓️ New schedule is ready!"
+        description={
+          newSchedule?.subjects.length
+            ? `Your teacher just published new classes for ${newSchedule.subjects.join(", ")}.`
+            : "Your teacher just published new classes in your subjects."
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-white/70">
+            Take a look at the latest classes added to your schedule — scroll down to{" "}
+            <span className="font-semibold text-white">My Schedule</span> at the bottom of
+            your dashboard.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => dismissSchedule(false)}
+              className="rounded-lg border border-white/15 px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10"
+            >
+              Later
+            </button>
+            <button
+              onClick={() => dismissSchedule(true)}
+              className="rounded-lg px-3 py-2 text-xs font-semibold text-white"
+              style={{ background: "linear-gradient(135deg,#6366F1,#8B5CF6)" }}
+            >
+              View schedule →
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         open={pickerOpen}

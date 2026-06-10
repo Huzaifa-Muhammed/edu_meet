@@ -43,11 +43,15 @@ type DashboardResp = {
     classes: Array<{
       id: string;
       classroomName: string;
+      subjectName?: string;
       startedAt?: string;
+      scheduledTime?: string;
+      durationMin?: number;
       status: string;
     }>;
   }>;
   activity: ActivityItem[];
+  pendingProposal: { weekStart: string; weekEnd: string; count: number } | null;
 };
 
 export default function TeacherDashboardPage() {
@@ -70,6 +74,31 @@ export default function TeacherDashboardPage() {
   return (
     <div className="min-h-full bg-bg p-[22px]">
       <div className="flex flex-col gap-4">
+        {/* AI proposal nudge */}
+        {d?.pendingProposal && (
+          <Link
+            href="/teacher/schedule"
+            className="flex items-center gap-3 rounded-[14px] px-4 py-3"
+            style={{
+              background: "rgba(245,158,11,.14)",
+              border: "1px solid rgba(245,158,11,.4)",
+            }}
+          >
+            <span className="text-[18px]">✨</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-bold text-white">
+                AI proposed {d.pendingProposal.count} class
+                {d.pendingProposal.count === 1 ? "" : "es"} for the week of{" "}
+                {format(new Date(`${d.pendingProposal.weekStart}T00:00:00`), "MMM d")}
+              </p>
+              <p className="text-[11px] text-white/55">
+                Review & approve on your Schedule page to publish it to students.
+              </p>
+            </div>
+            <span className="text-[11px] font-semibold text-[#FCD34D]">Review →</span>
+          </Link>
+        )}
+
         {/* Hero row */}
         <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
           <HeroCard
@@ -90,7 +119,7 @@ export default function TeacherDashboardPage() {
             cta={
               d?.liveNow
                 ? { label: "Re-enter →", href: `/teacher/classroom/${d.liveNow.id}` }
-                : { label: "Create class →", href: "/teacher/classes" }
+                : { label: "Create class →", href: "/teacher/schedule" }
             }
             gradient="linear-gradient(135deg,#3d1a08,#7c2d12,#c2410c)"
             art="🎤"
@@ -107,7 +136,7 @@ export default function TeacherDashboardPage() {
             cta={
               d?.nextUp
                 ? { label: "Start class →", href: `/teacher/classroom/${d.nextUp.id}` }
-                : { label: "Schedule →", href: "/teacher/classes" }
+                : { label: "Schedule →", href: "/teacher/schedule" }
             }
             gradient="linear-gradient(135deg,#0c2340,#1e3a6e,#1d4ed8)"
             art="📅"
@@ -191,7 +220,7 @@ export default function TeacherDashboardPage() {
           <Card>
             <SectionHdr>⚡ Quick actions</SectionHdr>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <QuickAction emoji="🎤" label="New class" href="/teacher/classes" />
+              <QuickAction emoji="🎤" label="New class" href="/teacher/schedule" />
               <QuickAction emoji="✍️" label="Grade" href="/teacher/grading" />
               <QuickAction emoji="📋" label="Assessments" href="/teacher/assessments" />
               <QuickAction emoji="👥" label="Students" href="/teacher/students" />
@@ -421,7 +450,15 @@ function ScheduleSection({
     <div>
       <div className="mb-3 flex items-center justify-between">
         <SectionHdr>📅 Your week, {firstName}</SectionHdr>
-        <span className="text-[10px] text-white/35">{format(today, "EEEE, MMM d")}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] text-white/35">{format(today, "EEEE, MMM d")}</span>
+          <Link
+            href="/teacher/schedule"
+            className="text-[10px] font-semibold text-[#FCD34D] hover:underline"
+          >
+            Full schedule →
+          </Link>
+        </div>
       </div>
 
       <div className="mb-4 flex gap-1.5">
@@ -453,12 +490,30 @@ function ScheduleSection({
               <p className="mt-1 text-[15px] font-extrabold text-white">
                 {format(d, "d")}
               </p>
-              {dayClasses.length > 0 && (
-                <span
-                  className="mx-auto mt-1 block h-[5px] w-[5px] rounded-full"
-                  style={{ background: "rgba(74,222,128,.7)" }}
-                />
-              )}
+              <div className="mt-1.5 flex flex-col gap-1">
+                {dayClasses.slice(0, 2).map((c) => (
+                  <Link
+                    key={c.id}
+                    href={`/teacher/classroom/${c.id}`}
+                    className="block truncate rounded-[6px] px-1 py-0.5 text-[8.5px] font-semibold leading-tight"
+                    style={{
+                      background:
+                        c.status === "live"
+                          ? "rgba(239,68,68,.2)"
+                          : "rgba(245,158,11,.16)",
+                      color: c.status === "live" ? "#F87171" : "#FCD34D",
+                    }}
+                    title={`${c.scheduledTime ?? ""} · ${c.subjectName || c.classroomName}`}
+                  >
+                    {c.scheduledTime ?? ""} {c.subjectName || c.classroomName}
+                  </Link>
+                ))}
+                {dayClasses.length > 2 && (
+                  <span className="text-[8px] font-semibold text-white/40">
+                    +{dayClasses.length - 2} more
+                  </span>
+                )}
+              </div>
             </div>
           );
         })}
@@ -510,10 +565,19 @@ function ScheduleSection({
 function ClassRow({
   cls,
 }: {
-  cls: { id: string; classroomName: string; startedAt?: string; status: string };
+  cls: {
+    id: string;
+    classroomName: string;
+    subjectName?: string;
+    startedAt?: string;
+    scheduledTime?: string;
+    status: string;
+  };
 }) {
   const isLive = cls.status === "live";
-  const timeLabel = cls.startedAt ? format(new Date(cls.startedAt), "HH:mm") : "—";
+  const timeLabel =
+    cls.scheduledTime ??
+    (cls.startedAt ? format(new Date(cls.startedAt), "HH:mm") : "—");
   return (
     <Link
       href={`/teacher/classroom/${cls.id}`}
@@ -529,6 +593,7 @@ function ClassRow({
       <div className="min-w-0 flex-1">
         <p className="truncate text-[12px] font-semibold text-white">{cls.classroomName}</p>
         <p className="truncate text-[10px] text-white/40">
+          {cls.subjectName ? `${cls.subjectName} · ` : ""}
           {isLive ? "Live now" : cls.status}
         </p>
       </div>

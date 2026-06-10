@@ -197,6 +197,98 @@ export interface Meeting {
   recordingUrl?: string;
   currentSlide?: number;
   participantIds: string[];
+  /* ── Scheduling (set on AI-generated + scheduled meetings) ──
+   * Explicit wall-clock strings are timezone-stable for display, unlike
+   * deriving from `startedAt`. `startedAt` is still populated (derived from
+   * these) so existing ordering/date-grouping keeps working. */
+  scheduledDate?: string; // "YYYY-MM-DD" (local wall date)
+  scheduledTime?: string; // "HH:MM" 24h (local wall time)
+  durationMin?: number;
+  subjectName?: string;
+  title?: string;
+  source?: "manual" | "ai";
+  /** AI proposals start as "proposed" (teacher-only); approval flips to
+   * "approved" (visible on dashboard + to students). Absent = approved
+   * (manual/legacy meetings). */
+  scheduleStatus?: "proposed" | "approved";
+  /** Set when a proposed meeting is approved — drives the student "new
+   * schedule ready" dashboard popup. */
+  approvedAt?: string;
+  /** Substitute cover (admin reassigns when a teacher is on emergency leave). */
+  originalTeacherId?: string;
+  substituteTeacherId?: string;
+  reassignedAt?: string;
+  reassignedBy?: string;
+}
+
+/* ── Teacher availability (for AI scheduling) ── */
+export interface AvailabilityBlock {
+  /** Day of week, Monday = 0 … Sunday = 6 */
+  day: number;
+  /** "HH:MM" 24h — start of the unavailable window (inclusive) */
+  start: string;
+  /** "HH:MM" 24h — end of the unavailable window (exclusive) */
+  end: string;
+}
+
+export interface TeacherAvailability {
+  teacherId: string;
+  timezone?: string;
+  /** Windows the teacher is NOT available. Default = fully available. */
+  blocks: AvailabilityBlock[];
+  updatedAt?: string;
+}
+
+/* ── Teacher leave requests ── */
+export interface LeaveRequest {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  teacherEmail?: string;
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string; // "YYYY-MM-DD" (== startDate for a single day)
+  reason: string;
+  /** Auto-flagged true when the leave starts within ~48h, or set by the teacher. */
+  emergency?: boolean;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
+  reviewNote?: string | null;
+}
+
+/* ── Cover requests (AI substitute marketplace) ──
+ * When an approved leave knocks out a class, the system broadcasts a
+ * "take this class" request to every other approved same-subject teacher.
+ * First acceptor auto-wins (instant cover); a later acceptor flips the
+ * request to "contested" so an admin picks the substitute. */
+export interface CoverAcceptance {
+  teacherId: string;
+  teacherName: string;
+  acceptedAt: string;
+}
+
+export interface CoverRequest {
+  id: string;
+  meetingId: string;
+  leaveId: string;
+  originalTeacherId: string;
+  originalTeacherName: string;
+  subjectName: string;
+  classTitle: string;
+  scheduledDate: string; // "YYYY-MM-DD"
+  scheduledTime: string; // "HH:MM"
+  durationMin: number;
+  /** open = awaiting a taker · assigned = covered · contested = >1 taker,
+   *  admin must choose · cancelled = no longer needed. */
+  status: "open" | "assigned" | "contested" | "cancelled";
+  acceptances: CoverAcceptance[];
+  assignedTeacherId: string | null;
+  assignedTeacherName: string | null;
+  resolvedAt: string | null;
+  /** admin uid that resolved a contest, or "auto" for first-accept wins. */
+  resolvedBy: string | null;
+  createdAt: string;
 }
 
 /* ── Media ── */

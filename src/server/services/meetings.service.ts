@@ -35,6 +35,25 @@ export const meetingsService = {
     return { id: doc.id, ...doc.data() };
   },
 
+  /** Reassign a meeting to a substitute teacher (admin cover for leave).
+   *  Preserves the original teacher so it can be reverted/audited. */
+  async reassignTeacher(meetingId: string, newTeacherId: string, byUid: string) {
+    const ref = adminDb.collection(Collections.MEETINGS).doc(meetingId);
+    const doc = await ref.get();
+    if (!doc.exists) throw notFound("Meeting");
+    const data = doc.data() ?? {};
+    const originalTeacherId =
+      (data.originalTeacherId as string | undefined) ?? (data.teacherId as string);
+    await ref.update({
+      teacherId: newTeacherId,
+      originalTeacherId,
+      substituteTeacherId: newTeacherId,
+      reassignedAt: new Date().toISOString(),
+      reassignedBy: byUid,
+    });
+    return { id: meetingId, teacherId: newTeacherId, originalTeacherId };
+  },
+
   async getUpcoming(teacherId: string) {
     const snap = await adminDb
       .collection(Collections.MEETINGS)
