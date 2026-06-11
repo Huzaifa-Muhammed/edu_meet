@@ -4,7 +4,51 @@
 
 ---
 
-## Last Updated: 2026-06-10 (session 9.5 — AI cover-request marketplace: leave → broadcast → first-accept-wins / second-accept-contests → admin decides)
+## Last Updated: 2026-06-11 (session 10 — downloadable class transcript from teacher-side captions, server-stored, identical copy for all participants)
+
+---
+
+## Session 10 (2026-06-11) — Downloadable class transcript from live captions
+
+Extended the existing live-captions feature into a persisted, downloadable **class transcript**. The **teacher's browser is the single recorder of record**; finalised captions are stored server-side per meeting, so every participant downloads the **same transcript regardless of join time**. Confirmed two design choices up-front via `AskUserQuestion`: **teacher-only speech** (auto-captured; clean lecture transcript) and **raw timestamped transcript** (no AI summary — deferred).
+
+### Why it was small
+Every finalised caption already flows through `usePubSub("LIVE_CAPTION")` and `live-captions.tsx`. They were ephemeral (sliding 12-window, 10s TTL). The whole feature is: also persist the host's finals, then render them to PDF.
+
+### Data model — new `transcripts` collection (`Collections.TRANSCRIPTS`)
+- Doc id = **meetingId** (one canonical doc per meeting → identical for all readers).
+- Shape: `{ meetingId, segments: TranscriptSegment[], updatedAt }`. `TranscriptSegment = { id, text, ts, name? }`.
+- **`id` is a unique per-segment uuid** so `FieldValue.arrayUnion(...segments)` never dedupes two distinct utterances (even identical text). Segments **ts-sorted on read**.
+
+### Service — `meetingsService` (in `meetings.service.ts`)
+- `appendTranscript(meetingId, segments)` — `arrayUnion` append, merge-set (single writer = host's browser, so safe). Exported `TranscriptSegment` type.
+- `getTranscript(meetingId)` — returns `{ meetingId, segments }`, ts-sorted; empty array if no doc.
+
+### Endpoint (1 new, 2 methods) — `src/app/api/meetings/[id]/transcript/route.ts`
+- **POST** — **host-only** (`requireRole(["teacher"])` + `meeting.teacherId === user.uid`). Zod-validated batch (≤200 segments/flush, text ≤2000 chars).
+- **GET** — any authenticated participant reads the canonical copy.
+
+### Client util — `src/lib/transcript/client.ts` (new)
+- Module-scoped **outbox** (`bufferSegment` / `flushTranscript` / `pendingCount`) decoupled from React state, so an end-of-class force-flush can drain it. Flush re-queues the batch on failure (order preserved).
+- `fetchTranscript(meetingId)` + **`downloadTranscriptPdf(meta, segments)`** — dependency-free **print-window PDF** (same pattern as `class-recap.tsx`; `pdfjs-dist` is a reader, not a generator).
+
+### Capture — `live-captions.tsx`
+- New props **`record` + `meetingId`**. STT now runs when `(prefs.enabled || record)` — so the host records **even if on-screen captions are off**. Recording is fully decoupled from the caption toggle (students see no change).
+- On a finalised result with `record`, buffers `{ text, ts, name }`; a 6s interval flushes + a drain runs on unmount. Teacher mount: `<LiveCaptions record meetingId={meetingId} />` in `main-area.tsx`. Student mount unchanged (`record` defaults false).
+
+### Download UI
+- **Teacher** — "Download transcript" button in `EndSummaryModal` (end-of-class wrap-up): force-flushes, fetches, prints. Page passes `meetingId` + `transcriptMeta`.
+- **Student** — "Transcript" button on `ClassRecapScreen` (post-class recap): fetches + prints. Empty transcript → `toast.info`.
+
+### Build status
+- `npx tsc --noEmit` → **0 errors**. New-file eslint clean (pre-existing `set-state-in-effect`/`Date.now` errors in `live-captions.tsx`/`main-area.tsx` are untouched). No new deps. New collection `transcripts` (single-doc get, no index). Committed `723e3c7`, pushed to `origin/main`.
+
+### Heads-up
+1. **Browser-gated:** capture needs Chrome/Edge `SpeechRecognition` + the teacher's mic on (same limit captions already had). Unsupported browsers record nothing — no crash.
+2. **~6s tail risk:** Bearer-header auth means `sendBeacon` can't carry the token, so an abrupt close may lose the last few seconds. The teacher's modal button force-flushes (their copy is complete); the 6s interval covers students.
+3. **Doc-size:** fine for normal class length (~100–200 KB/hour); a multi-hour class would eventually approach Firestore's 1 MB/doc limit — shard to a subcollection if that ever matters.
+4. **Teacher-only speech.** Students' words are **not** in the transcript (STT is per-mic-local; the host's browser only hears its own mic). Switching to everyone-with-CC-on would mean recording the `LIVE_CAPTION` pubsub instead, but that's inconsistent (depends on each student enabling CC).
+5. **AI summary deferred** — the Groq route is wired and could prepend a summary/key-points block to the PDF; not built this session.
 
 ---
 
