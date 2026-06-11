@@ -277,6 +277,12 @@ function ClassroomShell({
         open={endOpen}
         onClose={() => setEndOpen(false)}
         onConfirm={onConfirmEnd}
+        meetingId={meetingId}
+        transcriptMeta={{
+          classroomName,
+          subjectName: classroomSubject,
+          date: new Date().toISOString(),
+        }}
       />
     </div>
   );

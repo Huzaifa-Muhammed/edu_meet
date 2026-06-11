@@ -41,4 +41,5 @@ export const Collections = {
   TEACHER_AVAILABILITY: "teacherAvailability",
   LEAVE_REQUESTS: "leaveRequests",
   COVER_REQUESTS: "coverRequests",
+  TRANSCRIPTS: "transcripts",
 } as const;

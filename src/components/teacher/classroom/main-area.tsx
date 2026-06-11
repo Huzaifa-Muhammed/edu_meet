@@ -273,7 +273,7 @@ export function MainArea({
                 onClose={() => setCalcOpen(false)}
               />
             </LaserPointer>
-            <LiveCaptions />
+            <LiveCaptions record meetingId={meetingId} />
           </div>
           <VideoControlBar
             boardOn={whiteboardOn}

@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { X, Download } from "lucide-react";
+import { toast } from "sonner";
+import {
+  flushTranscript,
+  fetchTranscript,
+  downloadTranscriptPdf,
+  type TranscriptMeta,
+} from "@/lib/transcript/client";
 
 const SESSION_ISSUES = [
   { id: "audio", icon: "🎙", label: "Audio drops", sub: "students couldn't hear" },
@@ -16,14 +23,39 @@ export function EndSummaryModal({
   open,
   onClose,
   onConfirm,
+  meetingId,
+  transcriptMeta,
 }: {
   open: boolean;
   onClose: () => void;
   onConfirm: (args: { remarks: string; issues: string[]; impact: string }) => void;
+  meetingId?: string;
+  transcriptMeta?: TranscriptMeta;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [impact, setImpact] = useState<"low" | "med" | "high" | null>(null);
   const [remarks, setRemarks] = useState("");
+  const [downloading, setDownloading] = useState(false);
+
+  const downloadTranscript = async () => {
+    if (!meetingId || downloading) return;
+    setDownloading(true);
+    try {
+      // Drain anything still buffered on this device, then pull the canonical
+      // copy so the PDF includes the final moments of class.
+      await flushTranscript(meetingId);
+      const t = await fetchTranscript(meetingId);
+      if (!t.segments.length) {
+        toast.info("No transcript was captured for this class.");
+        return;
+      }
+      downloadTranscriptPdf(transcriptMeta ?? { classroomName: "Class" }, t.segments);
+    } catch {
+      toast.error("Couldn't load the transcript.");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   if (!open) return null;
 
@@ -172,6 +204,16 @@ export function EndSummaryModal({
             Remarks are saved with this class and visible on the Reports page.
           </span>
           <div className="flex gap-1.5">
+            {meetingId && (
+              <button
+                onClick={downloadTranscript}
+                disabled={downloading}
+                className="flex items-center gap-1.5 rounded-[7px] border border-bd2 bg-white px-4 py-1.5 text-[11px] font-medium text-t2 hover:bg-panel disabled:opacity-50"
+              >
+                <Download className="h-3.5 w-3.5" />
+                {downloading ? "Preparing…" : "Download transcript"}
+              </button>
+            )}
             <button
               onClick={onClose}
               className="rounded-[7px] border border-bd2 bg-white px-4 py-1.5 text-[11px] font-medium text-t2 hover:bg-panel"

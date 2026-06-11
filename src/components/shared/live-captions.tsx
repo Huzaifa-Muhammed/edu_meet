@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMeeting, usePubSub } from "@videosdk.live/react-sdk";
 import { Captions, X, ChevronDown } from "lucide-react";
 import api from "@/lib/api/client";
+import { bufferSegment, flushTranscript } from "@/lib/transcript/client";
 import { useAuth } from "@/providers/auth-provider";
 
 /** Languages we recognise + render captions in. recognitionLang is the
@@ -60,8 +61,21 @@ const cacheKey = (text: string, target: string) => `${target}::${text}`;
 
 /** Live-caption overlay. Mount once inside an EdumeetMeetingProvider on
  *  any container that has position:relative. Renders its own toggle
- *  button + settings popover and a fading caption strip at the bottom. */
-export function LiveCaptions({ className }: { className?: string }) {
+ *  button + settings popover and a fading caption strip at the bottom.
+ *
+ *  When `record` + `meetingId` are set (host side), the speaker's own
+ *  finalised captions are also buffered + periodically flushed to the
+ *  server as the canonical class transcript — independent of whether the
+ *  on-screen caption toggle is on. */
+export function LiveCaptions({
+  className,
+  record = false,
+  meetingId,
+}: {
+  className?: string;
+  record?: boolean;
+  meetingId?: string;
+}) {
   const { user } = useAuth();
   const { localMicOn } = useMeeting();
   const { publish, messages } = usePubSub("LIVE_CAPTION");
@@ -104,9 +118,24 @@ export function LiveCaptions({ className }: { className?: string }) {
     return () => clearInterval(id);
   }, []);
 
+  // ── Transcript outbox: periodic flush + drain on unmount (host only) ──
+  useEffect(() => {
+    if (!record || !meetingId) return;
+    const id = setInterval(() => {
+      flushTranscript(meetingId);
+    }, 6000);
+    return () => {
+      clearInterval(id);
+      // Best-effort final drain. Bearer-auth means sendBeacon can't carry
+      // the token, so this is a normal fire-and-forget POST.
+      flushTranscript(meetingId);
+    };
+  }, [record, meetingId]);
+
   // ── Speech Recognition lifecycle ─────────────────────────────
   useEffect(() => {
-    if (!prefs.enabled || !localMicOn || !supported) return;
+    // Run STT when captions are on for display, OR when we're the recorder.
+    if ((!prefs.enabled && !record) || !localMicOn || !supported) return;
     const SR =
       (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike })
         .SpeechRecognition ||
@@ -130,10 +159,27 @@ export function LiveCaptions({ className }: { className?: string }) {
         if (r.isFinal) final += r[0].transcript;
         else interim += r[0].transcript;
       }
+      const now = Date.now();
+
+      // Record finalised utterances to the transcript outbox (host only).
+      // Independent of the on-screen caption toggle.
+      if (record && meetingId) {
+        const finalText = final.trim();
+        if (finalText) {
+          bufferSegment(meetingId, {
+            text: finalText,
+            ts: now,
+            name: user?.displayName ?? "Teacher",
+          });
+        }
+      }
+
+      // Display + broadcast captions only when the user enabled them.
+      if (!prefs.enabled) return;
+
       const text = (final || interim).trim();
       if (!text) return;
 
-      const now = Date.now();
       // Throttle interim publishes to ~4Hz; always publish finals.
       if (!final && now - lastPublishRef.current < MIN_PUBLISH_INTERVAL_MS) return;
       lastPublishRef.current = now;
@@ -182,7 +228,7 @@ export function LiveCaptions({ className }: { className?: string }) {
         recognition.stop();
       } catch {}
     };
-  }, [prefs.enabled, prefs.sourceLang, localMicOn, supported, publish, user?.uid, user?.displayName]);
+  }, [prefs.enabled, prefs.sourceLang, localMicOn, supported, publish, user?.uid, user?.displayName, record, meetingId]);
 
   // ── Consume incoming captions (own + others) ─────────────────
   useEffect(() => {

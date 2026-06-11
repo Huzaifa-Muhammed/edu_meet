@@ -5,6 +5,8 @@ import { notFound } from "@/server/utils/errors";
 import { videosdkService } from "@/server/services/videosdk.service";
 import type { MeetingCreateInput } from "@/shared/schemas/meeting.schema";
 
+export type TranscriptSegment = { id: string; text: string; ts: number; name?: string };
+
 export const meetingsService = {
   async create(teacherId: string, data: MeetingCreateInput) {
     let videosdkRoomId: string | null = null;
@@ -255,6 +257,44 @@ export const meetingsService = {
       bannedUids: FieldValue.arrayRemove(uid),
     });
     return { meetingId, uid, banned: false };
+  },
+
+  /** Append a batch of finalised caption segments to the meeting transcript.
+   *  Single writer (the host's browser) flushes batches periodically, so
+   *  arrayUnion is safe — each segment carries a unique id so no two distinct
+   *  utterances are ever deduped away. The doc is keyed by meetingId so every
+   *  participant reads the same canonical transcript regardless of join time. */
+  async appendTranscript(
+    meetingId: string,
+    segments: { id: string; text: string; ts: number; name?: string }[],
+  ) {
+    if (segments.length === 0) return { id: meetingId, added: 0 };
+    const { FieldValue } = await import("firebase-admin/firestore");
+    await adminDb
+      .collection(Collections.TRANSCRIPTS)
+      .doc(meetingId)
+      .set(
+        {
+          meetingId,
+          segments: FieldValue.arrayUnion(...segments),
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+    return { id: meetingId, added: segments.length };
+  },
+
+  async getTranscript(meetingId: string) {
+    const doc = await adminDb
+      .collection(Collections.TRANSCRIPTS)
+      .doc(meetingId)
+      .get();
+    if (!doc.exists) return { meetingId, segments: [] as TranscriptSegment[] };
+    const data = doc.data() ?? {};
+    const segments = ((data.segments as TranscriptSegment[] | undefined) ?? [])
+      .slice()
+      .sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
+    return { meetingId, segments };
   },
 
   async getAttendance(meetingId: string) {

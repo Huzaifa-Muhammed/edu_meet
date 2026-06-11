@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Download, ArrowLeft, FileText, ListChecks, MessageCircleQuestion } from "lucide-react";
+import { Download, ArrowLeft, FileText, ListChecks, MessageCircleQuestion, Captions } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import api from "@/lib/api/client";
+import { fetchTranscript, downloadTranscriptPdf } from "@/lib/transcript/client";
 
 export type ClassRecap = {
   classroomName: string;
@@ -96,6 +99,32 @@ export function ClassRecapScreen({
     enabled: !!meetingId,
   });
   const r = q.data;
+  const [loadingTranscript, setLoadingTranscript] = useState(false);
+
+  const downloadTranscript = async () => {
+    if (loadingTranscript) return;
+    setLoadingTranscript(true);
+    try {
+      const t = await fetchTranscript(meetingId);
+      if (!t.segments.length) {
+        toast.info("No transcript was captured for this class.");
+        return;
+      }
+      downloadTranscriptPdf(
+        {
+          classroomName: r?.classroomName ?? "Class",
+          subjectName: r?.subjectName,
+          teacherName: r?.teacherName,
+          date: r?.date,
+        },
+        t.segments,
+      );
+    } catch {
+      toast.error("Couldn't load the transcript.");
+    } finally {
+      setLoadingTranscript(false);
+    }
+  };
 
   return (
     <div className="flex h-screen flex-col items-center overflow-y-auto bg-black px-4 py-10 text-white">
@@ -202,16 +231,26 @@ export function ClassRecapScreen({
             <ArrowLeft className="h-3.5 w-3.5" />
             Back to dashboard
           </button>
-          {r && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => downloadPdf(r)}
-              className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white"
-              style={{ background: "linear-gradient(135deg,#6366F1,#8B5CF6)" }}
+              onClick={downloadTranscript}
+              disabled={loadingTranscript}
+              className="flex items-center gap-1.5 rounded-lg border border-white/15 px-4 py-2 text-xs font-semibold text-white/80 hover:bg-white/10 disabled:opacity-50"
             >
-              <Download className="h-3.5 w-3.5" />
-              Download PDF
+              <Captions className="h-3.5 w-3.5" />
+              {loadingTranscript ? "Preparing…" : "Transcript"}
             </button>
-          )}
+            {r && (
+              <button
+                onClick={() => downloadPdf(r)}
+                className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white"
+                style={{ background: "linear-gradient(135deg,#6366F1,#8B5CF6)" }}
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download PDF
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
