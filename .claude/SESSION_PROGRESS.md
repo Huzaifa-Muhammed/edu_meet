@@ -4,7 +4,34 @@
 
 ---
 
-## Last Updated: 2026-06-11 (session 10 — downloadable class transcript from teacher-side captions, server-stored, identical copy for all participants)
+## Last Updated: 2026-06-11 (session 10.1 — skeleton loading states for the pages that flashed empty while fetching, across all three portals)
+
+---
+
+## Session 10.1 (2026-06-11) — Skeleton loading states (no more empty-flash on data pages)
+
+**Problem:** data-driven pages rendered their final layout **immediately with empty/zero fallbacks** (e.g. student dashboard showed "Nothing live right now", balance `0`) while the query was still in flight — so users saw a hollow page, not a loading state. Most list/table pages already had ad-hoc `animate-pulse` skeletons (session 8); the **dashboards, profiles, and student wallet/progress/offers** did not. Chosen scope (via `AskUserQuestion`): **fill the gaps** with a shared primitive, leave already-working skeletons alone.
+
+### Shared primitive — `src/components/shared/skeleton.tsx` (new)
+- `Skeleton` — `animate-pulse rounded-md bg-white/10` block sized via `className`. All three portals render on dark scopes, so the translucent-white wash reads correctly everywhere.
+- `SkeletonText` — stacked text-line skeletons (last line shortened).
+
+### Pages given layout-mirroring skeletons (8)
+Each gates on the primary query's react-query v5 **`isLoading`** (true only on first load, no cached data) and renders a skeleton that reproduces the real layout's wrapper/padding, grid column counts, and card/row counts — so the page **shape** appears instantly and content fades in.
+- **Student:** dashboard (3 hero + 5 stat + activity/quick-actions + week-strip/schedule), profile, wallet (balance card + 13 histogram bars + tx rows), progress (gauge + topic bars + quiz rows), offers (6 offer cards).
+- **Teacher:** dashboard (hero + stats + activity + quick-actions + week-strip/Today), profile. (The dashboard right-sidebar already had its own skeletons — left untouched.)
+- **Admin:** dashboard (4 KPI cards + quick-actions rows + platform stats; real greeting kept).
+
+### Execution note
+Built the primitive first, then fanned the page work out across **4 parallel subagents** (one per portal/group) since the files are independent. Verified the **final on-disk state** myself afterward (concurrent agents had briefly raced on shared `tsc` runs).
+
+### Build status
+- `npx tsc --noEmit` → **0 errors**. No new deps. New lint violations introduced: **none** (the 5 eslint findings in the touched dashboard/profile are all pre-existing — untouched subject-picker effect, schedule `useMemo`, a dead `useState` import, and two apostrophes in existing copy).
+
+### Heads-up
+1. **Gap-fill only.** The already-working list/table skeletons (reports, students, library, grading, admin lists, assessments…) were intentionally left as their original ad-hoc `animate-pulse` markup — not migrated to the new primitive. A future "full standardization pass" could unify them.
+2. **Classroom join screens** (`teacher`/`student` `classroom/[meetingId]`) still use their full-screen text loaders ("Joining class…" / "Preparing classroom…") — left as-is since they're a distinct full-screen state, not an empty-data flash.
+3. Skeleton tint is a fixed `bg-white/10` (works on all dark scopes). If a light scope is ever added, parameterize the tint.
 
 ---
 

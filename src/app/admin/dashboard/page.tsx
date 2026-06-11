@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { Skeleton } from "@/components/shared/skeleton";
 import {
   Users,
   GraduationCap,
@@ -34,6 +35,10 @@ export default function AdminDashboardPage() {
   });
 
   const o = overviewQ.data;
+
+  if (overviewQ.isLoading) {
+    return <DashboardSkeleton firstName={user?.displayName?.split(" ")[0]} />;
+  }
 
   return (
     <div className="bg-bg p-6">
@@ -128,6 +133,85 @@ export default function AdminDashboardPage() {
               Counts refresh every minute. Numbers reflect live Firestore state.
             </p>
           </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardSkeleton({ firstName }: { firstName?: string }) {
+  return (
+    <div className="bg-bg p-6">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <div>
+          <h1 className="text-lg font-semibold text-t">
+            Welcome back, {firstName ?? "Admin"}
+          </h1>
+          <p className="text-xs text-t3">
+            Snapshot of who&apos;s on the platform and what needs your attention.
+          </p>
+        </div>
+
+        {/* KPI stat cards — mirrors the 4-up grid */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-2xl border border-bd bg-surf p-4"
+            >
+              <div className="mb-2 flex items-center justify-between">
+                <Skeleton className="h-7 w-7 rounded-lg" />
+                <Skeleton className="h-3.5 w-3.5 rounded" />
+              </div>
+              <Skeleton className="h-7 w-16" />
+              <Skeleton className="mt-1.5 h-3 w-24" />
+              <Skeleton className="mt-1.5 h-3 w-32" />
+            </div>
+          ))}
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* Quick actions card — 4 action rows */}
+          <div className="rounded-2xl border border-bd bg-surf p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Skeleton className="h-6 w-6 rounded-md" />
+              <Skeleton className="h-4 w-28" />
+            </div>
+            <div className="grid gap-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between rounded-xl border border-bd bg-panel px-3 py-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="mt-1.5 h-3 w-56" />
+                  </div>
+                  <Skeleton className="h-3.5 w-3.5 rounded" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Platform card — 4 stat cells */}
+          <div className="rounded-2xl border border-bd bg-surf p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Skeleton className="h-6 w-6 rounded-md" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl border border-bd bg-panel px-3 py-2"
+                >
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="mt-1.5 h-5 w-10" />
+                </div>
+              ))}
+            </div>
+            <Skeleton className="mt-3 h-3 w-3/4" />
+          </div>
         </div>
       </div>
     </div>

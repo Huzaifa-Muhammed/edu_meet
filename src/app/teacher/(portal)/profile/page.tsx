@@ -7,6 +7,7 @@ import { SubjectPicker } from "@/components/shared/subject-picker";
 import { TeacherCredentials } from "@/components/shared/teacher-credentials";
 import { ChangePasswordForm } from "@/components/shared/change-password-form";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { Skeleton } from "@/components/shared/skeleton";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
@@ -23,7 +24,7 @@ export default function TeacherProfilePage() {
   const { user } = useCurrentUser();
   const router = useRouter();
 
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading } = useQuery({
     queryKey: ["user", "profile", user?.uid],
     queryFn: () =>
       api.get(`/users/${user!.uid}/profile`) as unknown as Promise<Profile>,
@@ -34,6 +35,8 @@ export default function TeacherProfilePage() {
     await signOut(getFirebaseAuth());
     router.replace("/auth/login");
   }
+
+  if (isLoading) return <ProfileSkeleton />;
 
   return (
     <div className="min-h-full bg-bg p-6">
@@ -112,6 +115,44 @@ export default function TeacherProfilePage() {
             />
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ProfileSkeleton() {
+  return (
+    <div className="min-h-full bg-bg p-6">
+      <div className="mx-auto max-w-3xl space-y-6">
+        <div className="flex justify-end">
+          <Skeleton className="h-7 w-24 rounded-lg" />
+        </div>
+
+        {/* Stat cards */}
+        <div className="grid gap-3 sm:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-bd bg-surf p-4">
+              <div className="mb-1.5 flex items-center gap-2">
+                <Skeleton className="h-4 w-4" />
+                <Skeleton className="h-2.5 w-20" />
+              </div>
+              <Skeleton className="h-6 w-10" />
+            </div>
+          ))}
+        </div>
+
+        {/* Info cards */}
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="rounded-xl border border-bd bg-surf p-6">
+            <Skeleton className="mb-2 h-4 w-32" />
+            <Skeleton className="mb-4 h-3 w-2/3" />
+            <div className="space-y-3">
+              <Skeleton className="h-9 w-full rounded-lg" />
+              <Skeleton className="h-9 w-full rounded-lg" />
+              <Skeleton className="h-9 w-1/2 rounded-lg" />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

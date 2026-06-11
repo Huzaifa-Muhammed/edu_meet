@@ -10,6 +10,7 @@ import api from "@/lib/api/client";
 import { SubjectPicker } from "@/components/shared/subject-picker";
 import { ChangePasswordForm } from "@/components/shared/change-password-form";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { Skeleton, SkeletonText } from "@/components/shared/skeleton";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { signOut } from "firebase/auth";
 import { UserUpdateSchema, type UserUpdateInput } from "@/shared/schemas/user.schema";
@@ -100,6 +101,11 @@ export default function StudentProfilePage() {
             100,
         )
       : null;
+
+  const pageLoading = !user || classesQ.isLoading || assessmentsQ.isLoading;
+  if (pageLoading) {
+    return <ProfileSkeleton />;
+  }
 
   return (
     <div className="flex-1 overflow-y-auto bg-bg p-6">
@@ -237,6 +243,90 @@ export default function StudentProfilePage() {
               classes in your subjects.
             </p>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileSkeleton() {
+  return (
+    <div className="flex-1 overflow-y-auto bg-bg p-6">
+      <div className="mx-auto max-w-3xl space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-6 w-44" />
+          <Skeleton className="h-7 w-20 rounded-lg" />
+        </div>
+
+        {/* 3 stat cards */}
+        <div className="grid gap-3 sm:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-bd bg-surf p-4">
+              <div className="mb-1.5 flex items-center gap-2">
+                <Skeleton className="h-4 w-4 rounded" />
+                <Skeleton className="h-2.5 w-24" />
+              </div>
+              <Skeleton className="h-6 w-12" />
+            </div>
+          ))}
+        </div>
+
+        {/* Personal info */}
+        <div className="rounded-xl border border-bd bg-surf p-6">
+          <Skeleton className="mb-4 h-4 w-28" />
+          <div className="space-y-5">
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-16 w-16 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-3.5 w-32" />
+                <Skeleton className="h-3 w-40" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-9 w-full rounded-lg" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-[68px] w-full rounded-lg" />
+            </div>
+            <Skeleton className="h-9 w-36 rounded-lg" />
+          </div>
+        </div>
+
+        {/* Subjects */}
+        <div className="rounded-xl border border-bd bg-surf p-6">
+          <Skeleton className="mb-1 h-4 w-28" />
+          <Skeleton className="mb-4 h-3 w-3/4" />
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-7 w-20 rounded-full" />
+            ))}
+          </div>
+        </div>
+
+        {/* Security */}
+        <div className="rounded-xl border border-bd bg-surf p-6">
+          <Skeleton className="mb-1 h-4 w-20" />
+          <Skeleton className="mb-4 h-3 w-2/3" />
+          <SkeletonText lines={3} />
+        </div>
+
+        {/* My classes */}
+        <div className="rounded-xl border border-bd bg-surf p-6">
+          <Skeleton className="mb-3 h-4 w-24" />
+          <div className="space-y-1.5">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 rounded-lg border border-bd bg-panel/40 px-3 py-2"
+              >
+                <Skeleton className="h-3.5 w-3.5 rounded" />
+                <Skeleton className="h-3 w-40" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

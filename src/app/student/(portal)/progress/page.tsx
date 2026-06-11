@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api/client";
+import { Skeleton } from "@/components/shared/skeleton";
 
 type Summary = {
   overallPct: number;
@@ -40,6 +41,8 @@ export default function ProgressPage() {
   const circ = 2 * Math.PI * 34;
   const dash = `${circ}`;
   const offset = circ * (1 - pct / 100);
+
+  if (q.isLoading) return <ProgressSkeleton />;
 
   return (
     <div className="min-h-full bg-bg p-[22px]">
@@ -222,6 +225,77 @@ export default function ProgressPage() {
               No quiz history yet. Complete an assessment to see it here.
             </p>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProgressSkeleton() {
+  return (
+    <div className="min-h-full bg-bg p-[22px]">
+      <Skeleton className="mb-3 h-3 w-32" />
+
+      <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
+        {/* Left column */}
+        <div className="flex flex-col gap-3.5">
+          {/* Overview */}
+          <div
+            className="flex items-center gap-4 rounded-[16px] p-4"
+            style={{
+              background: "rgba(255,255,255,.04)",
+              border: "1px solid rgba(255,255,255,.07)",
+            }}
+          >
+            <Skeleton className="h-20 w-20 flex-shrink-0 rounded-full" />
+            <div className="flex-1">
+              <Skeleton className="h-3.5 w-28" />
+              <Skeleton className="mt-1.5 h-2.5 w-40" />
+              <Skeleton className="mt-2 h-2.5 w-32" />
+            </div>
+          </div>
+
+          {/* Topic bars */}
+          <div
+            className="flex flex-col gap-2.5 rounded-[16px] p-3.5"
+            style={{
+              background: "rgba(255,255,255,.03)",
+              border: "1px solid rgba(255,255,255,.06)",
+            }}
+          >
+            <Skeleton className="mb-1 h-2.5 w-16" />
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-2.5">
+                <Skeleton className="h-3.5 w-[22px] flex-shrink-0" />
+                <Skeleton className="h-2.5 flex-1" />
+                <Skeleton className="h-[5px] flex-[2] rounded-[3px]" />
+                <Skeleton className="h-2.5 w-[30px]" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right column: quiz history */}
+        <div
+          className="rounded-[16px] p-3.5"
+          style={{
+            background: "rgba(255,255,255,.03)",
+            border: "1px solid rgba(255,255,255,.06)",
+          }}
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <Skeleton className="h-2.5 w-28" />
+            <Skeleton className="h-2.5 w-16" />
+          </div>
+          <div className="flex flex-col gap-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Skeleton className="h-2.5 w-5" />
+                <Skeleton className="h-1.5 flex-1 rounded-[3px]" />
+                <Skeleton className="h-2.5 w-[72px]" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

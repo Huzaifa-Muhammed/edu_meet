@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import api from "@/lib/api/client";
+import { Skeleton } from "@/components/shared/skeleton";
 
 type WalletResp = {
   tokens: {
@@ -44,6 +45,8 @@ export default function WalletPage() {
   const data = q.data;
   const histValues = (data?.histogram ?? []).map((h) => h.value);
   const histMax = Math.max(1, ...histValues);
+
+  if (q.isLoading) return <WalletSkeleton />;
 
   return (
     <div className="min-h-full bg-bg p-[22px]">
@@ -193,6 +196,92 @@ export default function WalletPage() {
               No transactions yet. Earn your first token by completing a quiz or joining a live class.
             </p>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WalletSkeleton() {
+  return (
+    <div className="min-h-full bg-bg p-[22px]">
+      <div className="mb-3 flex items-center justify-between">
+        <Skeleton className="h-3 w-44" />
+      </div>
+
+      <div className="grid gap-4" style={{ gridTemplateColumns: "320px 1fr" }}>
+        {/* Balance card */}
+        <div
+          className="rounded-[20px] p-[22px]"
+          style={{
+            background: "linear-gradient(135deg,#1a0533,#2d1065,#3730a3)",
+            border: "1px solid rgba(99,102,241,.3)",
+            boxShadow: "0 8px 32px rgba(99,102,241,.2)",
+          }}
+        >
+          <Skeleton className="h-2.5 w-24" />
+          <Skeleton className="mt-2 h-12 w-40" />
+          <Skeleton className="mb-4 mt-1.5 h-2.5 w-36" />
+
+          {/* 13-bar chart */}
+          <div className="mb-4 flex items-end gap-[3px]" style={{ height: 50 }}>
+            {Array.from({ length: 13 }).map((_, i) => (
+              <Skeleton
+                key={i}
+                className="flex-1 rounded-t-[3px]"
+                style={{ height: `${30 + ((i * 37) % 70)}%` }}
+              />
+            ))}
+          </div>
+
+          {/* 3-col footer */}
+          <div
+            className="grid gap-2.5 pt-3.5"
+            style={{
+              gridTemplateColumns: "1fr 1fr 1fr",
+              borderTop: "1px solid rgba(255,255,255,.1)",
+            }}
+          >
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i}>
+                <Skeleton className="h-2 w-full" />
+                <Skeleton className="mt-1 h-3.5 w-12" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Transactions panel */}
+        <div
+          className="rounded-[16px] p-4"
+          style={{
+            background: "rgba(255,255,255,.03)",
+            border: "1px solid rgba(255,255,255,.06)",
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-3 w-40" />
+            <Skeleton className="h-2.5 w-16" />
+          </div>
+          <div className="mt-3 flex flex-col gap-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2.5 rounded-[10px] px-2.5 py-2.5"
+                style={{
+                  background: "rgba(255,255,255,.03)",
+                  border: "1px solid rgba(255,255,255,.05)",
+                }}
+              >
+                <Skeleton className="h-7 w-8 flex-shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1">
+                  <Skeleton className="h-3 w-2/3" />
+                  <Skeleton className="mt-1 h-2.5 w-1/3" />
+                </div>
+                <Skeleton className="h-3 w-12 flex-shrink-0" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

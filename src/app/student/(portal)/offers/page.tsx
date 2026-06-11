@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import api from "@/lib/api/client";
+import { Skeleton } from "@/components/shared/skeleton";
 
 type Offer = {
   id: string;
@@ -38,6 +39,8 @@ export default function OffersPage() {
   const redeemedSet = new Set(q.data?.redemptions.map((r) => r.offerId) ?? []);
   const balance = q.data?.balance ?? 0;
   const offers = q.data?.offers ?? [];
+
+  if (q.isLoading) return <OffersSkeleton />;
 
   return (
     <div className="min-h-full bg-bg p-[22px]">
@@ -130,6 +133,40 @@ export default function OffersPage() {
       <p className="mt-3.5 text-right text-[12px] text-white/50">
         Your balance: <b className="text-[#A5B4FC]">{balance} BT</b>
       </p>
+    </div>
+  );
+}
+
+function OffersSkeleton() {
+  return (
+    <div className="min-h-full bg-bg p-[22px]">
+      <Skeleton className="mb-3 h-3 w-40" />
+
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="relative flex flex-col gap-1.5 rounded-[16px] p-4"
+            style={{
+              background: "rgba(255,255,255,.04)",
+              border: "1px solid rgba(255,255,255,.08)",
+            }}
+          >
+            <Skeleton className="mb-1 h-7 w-9 rounded-[8px]" />
+            <Skeleton className="h-3.5 w-2/3" />
+            <div className="flex-1">
+              <Skeleton className="h-2.5 w-full" />
+              <Skeleton className="mt-1.5 h-2.5 w-4/5" />
+            </div>
+            <Skeleton className="mt-1 h-3.5 w-16" />
+            <Skeleton className="mt-1.5 h-[30px] w-full rounded-full" />
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3.5 flex justify-end">
+        <Skeleton className="h-3 w-36" />
+      </div>
     </div>
   );
 }
