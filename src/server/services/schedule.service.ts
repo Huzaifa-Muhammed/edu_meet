@@ -4,6 +4,7 @@ import { adminDb } from "@/server/firebase-admin";
 import { Collections } from "@/shared/constants/collections";
 import { resolveSubjectName } from "@/shared/constants/subjects";
 import { leaveService } from "@/server/services/leave.service";
+import { teacherSubjects } from "@/server/services/cover.service";
 import { groqProvider, type ChatMessage } from "@/server/providers/ai/groq";
 import type {
   AvailabilityBlock,
@@ -209,13 +210,18 @@ export const scheduleService = {
     const myMeetings = meetingsSnap.docs.map((d) => ({ id: d.id, ref: d.ref, ...(d.data() as MeetingDoc) }));
 
     // Target week: explicit (e.g. Regenerate), else the running week — but only
-    // when it has no schedule yet.
-    const targetWeek = opts.weekStart ?? currentWeekIfEmpty(myMeetings);
+    // when today or tomorrow still has no class.
+    const targetWeek = opts.weekStart ?? currentWeekIfNeeded(myMeetings);
     if (!targetWeek)
       return { created: 0, weekStart: null, usedAi: false, reason: "already-scheduled" as const };
 
     const availability = await this.getAvailability(teacherId);
-    const occupied = await gatherOccupiedBySubject(teacherId, classrooms);
+    // While *placing* new slots, stagger around other same-subject teachers'
+    // approved AND still-proposed classes, so two teachers proposing close
+    // together don't land on the same time.
+    const occupied = await gatherOccupiedBySubject(teacherId, classrooms, {
+      includeProposed: true,
+    });
     const classroomSubjectNorm = new Map(
       classrooms.map((c) => [c.id, normSubject(c.subjectName)]),
     );
@@ -242,6 +248,16 @@ export const scheduleService = {
         weekSet.has(m.scheduledDate),
     );
 
+    // Days that already have a committed (approved/legacy, non-ended) class —
+    // we never pile new auto-proposals onto a day the teacher already has a
+    // schedule for; only the empty days get filled.
+    const committedDates = new Set(
+      myMeetings
+        .filter((m) => m.status !== "ended" && m.scheduleStatus !== "proposed")
+        .map((m) => m.scheduledDate ?? m.startedAt?.slice(0, 10))
+        .filter((d): d is string => !!d),
+    );
+
     const classroomMeta = new Map(classrooms.map((c) => [c.id, c]));
     const today = todayStr();
     const leaveDates = await leaveService.approvedLeaveDates(teacherId);
@@ -250,6 +266,7 @@ export const scheduleService = {
     for (const date of weekDates(targetWeek)) {
       if (date < today) continue;
       if (leaveDates.has(date)) continue; // teacher is on approved leave
+      if (committedDates.has(date)) continue; // day already has a committed class
       const dow = dayOfWeekMon0(date);
       for (const entry of timetable) {
         if (entry.day !== dow) continue;
@@ -293,9 +310,10 @@ export const scheduleService = {
     };
   },
 
-  /** Lazily ensure the RUNNING week has an AI proposal. If the teacher already
-   *  has a schedule for this week, do nothing. Skips if auto is disabled, or we
-   *  already auto-proposed this exact week (so a discard isn't instantly undone). */
+  /** Lazily ensure today + tomorrow are covered. If the teacher already has a
+   *  class for both today and tomorrow, do nothing. Otherwise fill the running
+   *  week's empty days. Skips if auto is disabled, or we already auto-proposed
+   *  this exact week (so a discard isn't instantly undone). */
   async autoProposeIfNeeded(teacherId: string) {
     const availRef = adminDb.collection(Collections.TEACHER_AVAILABILITY).doc(teacherId);
     const availDoc = await availRef.get();
@@ -312,7 +330,7 @@ export const scheduleService = {
       .get();
     const myMeetings = snap.docs.map((d) => d.data() as MeetingDoc);
 
-    const target = currentWeekIfEmpty(myMeetings);
+    const target = currentWeekIfNeeded(myMeetings);
     if (!target || target === lastAutoWeek) return null;
 
     const res = await this.generate(teacherId, { weekStart: target });
@@ -327,6 +345,8 @@ export const scheduleService = {
    *  collides with an approved same-subject class from another teacher. */
   async approve(teacherId: string, opts: { weekStart?: string }) {
     const classrooms = await loadClassrooms(teacherId);
+    // At publish time only drop a class against a *real* approved clash — never
+    // against another teacher's still-discardable proposal.
     const occupied = await gatherOccupiedBySubject(teacherId, classrooms);
 
     const snap = await adminDb
@@ -407,11 +427,12 @@ function hydrateMeeting(
 }
 
 async function loadClassrooms(teacherId: string): Promise<ClassroomLite[]> {
-  const snap = await adminDb
-    .collection(Collections.CLASSROOMS)
-    .where("teacherId", "==", teacherId)
-    .get();
-  return snap.docs.map((d) => {
+  const [snap, userDoc] = await Promise.all([
+    adminDb.collection(Collections.CLASSROOMS).where("teacherId", "==", teacherId).get(),
+    adminDb.collection(Collections.USERS).doc(teacherId).get(),
+  ]);
+
+  const all = snap.docs.map((d) => {
     const c = d.data() as {
       name?: string;
       subjectId?: string;
@@ -427,22 +448,34 @@ async function loadClassrooms(teacherId: string): Promise<ClassroomLite[]> {
       students: c.studentIds?.length ?? 0,
     };
   });
+
+  // Only schedule subjects the teacher actually teaches (their declared
+  // subjects / specializations). A teacher of English + Math never gets a
+  // class in any other subject. If the teacher has declared no subjects, we
+  // don't restrict (otherwise they'd get no schedule at all).
+  const subjectSet = new Set(teacherSubjects(userDoc.data() ?? {}));
+  if (subjectSet.size === 0) return all;
+  return all.filter((c) => subjectSet.has(normSubject(c.subjectName)));
 }
 
-/** Product rule: the AI only ever fills the **running (current) week**.
- *  Returns this week's Monday if the teacher has NO schedule for it yet — any
- *  meeting in the week (proposed/approved, past or upcoming) counts as "has a
- *  schedule" — otherwise null. */
-function currentWeekIfEmpty(
+/** Product rule: the AI keeps the **running week** filled, but only kicks in
+ *  when **today or tomorrow has no class yet**. If the teacher already has a
+ *  class scheduled for BOTH today and tomorrow, there's nothing to create.
+ *  Returns this week's Monday when (re)generation is needed, else null.
+ *  (Generation itself skips days that already have a committed class, so only
+ *  the genuinely empty days get filled.) */
+function currentWeekIfNeeded(
   meetings: { scheduledDate?: string; startedAt?: string }[],
 ): string | null {
-  const ws = weekStartMon(todayStr());
-  const dates = new Set(weekDates(ws));
-  const has = meetings.some((m) => {
-    const date = m.scheduledDate ?? m.startedAt?.slice(0, 10);
-    return date ? dates.has(date) : false;
-  });
-  return has ? null : ws;
+  const today = todayStr();
+  const tomorrow = addDaysStr(today, 1);
+  const scheduled = new Set(
+    meetings
+      .map((m) => m.scheduledDate ?? m.startedAt?.slice(0, 10))
+      .filter((d): d is string => !!d),
+  );
+  const covered = scheduled.has(today) && scheduled.has(tomorrow);
+  return covered ? null : weekStartMon(today);
 }
 
 /** Approved same-subject classes from OTHER teachers → occupied weekly slots,
@@ -450,6 +483,7 @@ function currentWeekIfEmpty(
 async function gatherOccupiedBySubject(
   teacherId: string,
   classrooms: ClassroomLite[],
+  opts: { includeProposed?: boolean } = {},
 ): Promise<Map<string, OccupiedSlot[]>> {
   const out = new Map<string, OccupiedSlot[]>();
   const subjectNames = Array.from(
@@ -469,7 +503,9 @@ async function gatherOccupiedBySubject(
 
   for (const m of docs) {
     if (m.teacherId === teacherId) continue; // ignore own classes
-    if (m.scheduleStatus === "proposed") continue; // only approved/legacy block
+    // Approved/legacy classes always block; proposals from other teachers block
+    // only while placing (includeProposed), so generation staggers around them.
+    if (m.scheduleStatus === "proposed" && !opts.includeProposed) continue;
     if (m.status === "ended") continue;
     if (!m.scheduledDate || !m.scheduledTime) continue;
     const sub = normSubject(m.subjectName);

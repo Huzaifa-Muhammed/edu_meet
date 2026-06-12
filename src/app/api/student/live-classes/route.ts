@@ -5,18 +5,10 @@ import { verifyToken } from "@/server/auth/verify-token";
 import { requireRole } from "@/server/auth/require-role";
 import { adminDb } from "@/server/firebase-admin";
 import { Collections } from "@/shared/constants/collections";
-import { resolveSubjectName } from "@/shared/constants/subjects";
+import { relevantClassrooms, type RelevantClassroom } from "@/server/services/student-classes.service";
 import { ok, fail } from "@/server/utils/response";
 
-type Classroom = {
-  id: string;
-  name: string;
-  subjectId: string;
-  subjectName?: string;
-  grade: number;
-  teacherId: string;
-  studentIds?: string[];
-};
+type Classroom = RelevantClassroom;
 
 type Meeting = {
   id: string;
@@ -31,10 +23,6 @@ type Meeting = {
 
 type Teacher = { displayName?: string; email?: string; photoUrl?: string };
 
-function normalize(s: string) {
-  return s.trim().toLowerCase();
-}
-
 /**
  * Returns live + upcoming meetings tied to classrooms the student is
  * enrolled in OR classrooms matching the student's subjects. Enriched
@@ -47,39 +35,9 @@ export async function GET(req: NextRequest) {
     requireRole(user, ["student"]);
 
     const userDoc = await adminDb.collection(Collections.USERS).doc(user.uid).get();
-    const subjects = ((userDoc.data()?.subjects as string[] | undefined) ?? []).map(
-      normalize,
-    );
-    const subjectsSet = new Set(subjects);
     const scheduleSeenAt = (userDoc.data()?.scheduleSeenAt as string | undefined) ?? "";
 
-    const subjSnap = await adminDb.collection(Collections.SUBJECTS).get();
-    const subjectNameById = new Map<string, string>();
-    for (const d of subjSnap.docs) {
-      const n = (d.data() as { name?: string }).name;
-      if (n) subjectNameById.set(d.id, n);
-    }
-
-    const allClassSnap = await adminDb.collection(Collections.CLASSROOMS).get();
-    const classrooms: Classroom[] = allClassSnap.docs.map(
-      (d) => ({ id: d.id, ...(d.data() as Omit<Classroom, "id">) }),
-    );
-
-    const matches = (c: Classroom) => {
-      if ((c.studentIds ?? []).includes(user.uid)) return true;
-      if (c.subjectName && subjectsSet.has(normalize(c.subjectName))) return true;
-      if (subjectsSet.has(normalize(c.subjectId))) return true;
-      const docName = subjectNameById.get(c.subjectId);
-      if (docName && subjectsSet.has(normalize(docName))) return true;
-      return false;
-    };
-
-    const relevant = classrooms
-      .filter(matches)
-      .map((c) => ({
-        ...c,
-        subjectName: resolveSubjectName(c.subjectId, c.subjectName, subjectNameById),
-      }));
+    const { classrooms: relevant } = await relevantClassrooms(user.uid);
     const relevantIds = new Set(relevant.map((c) => c.id));
     if (relevantIds.size === 0)
       return ok({

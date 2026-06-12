@@ -9,6 +9,7 @@ import api from "@/lib/api/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { CreateAssessmentForm } from "@/components/teacher/create-assessment-form";
 import { Skeleton } from "@/components/shared/skeleton";
+import { classWindow } from "@/lib/schedule/class-window";
 
 type ActivityItem = {
   id: string;
@@ -72,11 +73,66 @@ export default function TeacherDashboardPage() {
   const d = dashQ.data;
   const firstName = user?.displayName?.split(" ")[0] ?? "Teacher";
 
+  // A scheduled class that's ongoing or about to start (local time) but not yet
+  // live — the teacher just needs to join to start it. Live classes are already
+  // covered by the "Live now" hero, so we only surface not-yet-started ones.
+  const ongoing = (() => {
+    if (!d?.schedule) return null;
+    let best: { id: string; name: string; time?: string; startsInMin: number; now: boolean } | null =
+      null;
+    for (const day of d.schedule) {
+      for (const c of day.classes) {
+        if (c.status !== "scheduled") continue;
+        const w = classWindow(day.date, c.scheduledTime, c.durationMin);
+        if (w.ended || (!w.ongoing && !w.imminent)) continue;
+        if (!best || w.startsInMin < best.startsInMin)
+          best = {
+            id: c.id,
+            name: c.classroomName,
+            time: c.scheduledTime,
+            startsInMin: w.startsInMin,
+            now: w.ongoing,
+          };
+      }
+    }
+    return best;
+  })();
+
   if (dashQ.isLoading) return <DashboardSkeleton />;
 
   return (
     <div className="min-h-full bg-bg p-[22px]">
       <div className="flex flex-col gap-4">
+        {/* Class-time nudge: a scheduled class is starting now / very soon */}
+        {ongoing && (
+          <Link
+            href={`/teacher/classroom/${ongoing.id}`}
+            className="flex items-center gap-3 rounded-[14px] px-4 py-3"
+            style={{
+              background: "rgba(220,38,38,.16)",
+              border: "1px solid rgba(220,38,38,.5)",
+            }}
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-bold text-white">
+                {ongoing.now
+                  ? `${ongoing.name} is starting now`
+                  : `${ongoing.name} starts in about ${Math.max(1, Math.round(ongoing.startsInMin))} min`}
+              </p>
+              <p className="text-[11px] text-white/60">
+                {ongoing.time ? `Scheduled ${ongoing.time} · ` : ""}Join to start the class for your students.
+              </p>
+            </div>
+            <span className="rounded-lg bg-red-600 px-3 py-1.5 text-[11px] font-semibold text-white">
+              Join &amp; start →
+            </span>
+          </Link>
+        )}
+
         {/* AI proposal nudge */}
         {d?.pendingProposal && (
           <Link

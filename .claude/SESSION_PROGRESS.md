@@ -4,7 +4,33 @@
 
 ---
 
-## Last Updated: 2026-06-11 (session 10.1 — skeleton loading states for the pages that flashed empty while fetching, across all three portals)
+## Last Updated: 2026-06-12 (session 11 — AI-schedule enhancements: robust same-subject staggering + 2-min class reminders + dashboard "join now")
+
+---
+
+## Session 11 (2026-06-12) — Cross-teacher staggering + class-time reminders & one-click join
+
+Enhanced the AI scheduling system so (a) same-subject teachers never collide on a time slot, (b) both teacher and student get a **dismissible 2-minute-prior reminder** before each class, and (c) the class surfaces as a **"join now" card on the teacher dashboard** so nobody hand-creates a meeting. Two product decisions confirmed via `AskUserQuestion`: **students join only once the teacher is live** (no empty-room early entry), and **per-teacher auto-scheduling stays** (no admin bulk button — we hardened the conflict check instead).
+
+### Cross-teacher same-subject staggering (server)
+- `gatherOccupiedBySubject(teacherId, classrooms, { includeProposed })` in `schedule.service.ts` gained the flag. **Generation** now passes `includeProposed:true` → a teacher's new AI slots stagger around other same-subject teachers' approved **and** still-proposed classes (whoever proposes first reserves the slot; e.g. A 2–4pm ⇒ B placed before 2 / after 4). **Approve** keeps approved-only, so a class is only ever *dropped* at publish against a real approved clash, never a discardable proposal. Reuses the existing `OccupiedSlot` map + `slotHitsOccupied` checks — no new placement logic. (Builds on the existing subject-filtering in `loadClassrooms`, committed alongside.)
+
+### 2-minute reminders + ongoing detection
+- **`src/lib/schedule/class-window.ts`** (new) — pure `classWindow(date, time, dur)` computing `{ startsInMin, imminent, ongoing, ended }` in the **viewer's local timezone** (parses `${date}T${time}:00` with **no `Z`**), so timing is correct per viewer with zero server-TZ infrastructure. Also exports the shared `ClassAlert` type. `imminent` is widened ~0.5 min so a 30s poll reliably catches the 2-min mark.
+- **Lightweight alert endpoints** (new): `GET /api/teacher/class-alerts` + `GET /api/student/class-alerts` return published (non-proposed) scheduled/live classes within **today ±1 day** (server-UTC window; client does the precise local math). The student one reuses the new **`relevantClassrooms(uid)`** helper (`src/server/services/student-classes.service.ts`, extracted from `live-classes/route.ts` which now consumes it) so reminders line up exactly with the dashboard feed, and carries `enrolled`.
+- **Reminder popups** (new, follow the `cover-request-popup` pattern — react-query 30s poll, `localStorage` dismissal keyed **`meetingId:phase`** so dismissing "soon" doesn't suppress the later "live"): `src/components/teacher/class-reminder-popup.tsx` (bottom-**left**, to clear the bottom-right cover popup; "Join & start" → `/teacher/classroom/{id}` which auto-goes-live) and `src/components/student/class-reminder-popup.tsx` (bottom-right; "get ready" pre-live, "Join now" once `status==="live"` → classroom if enrolled, else dashboard). Mounted globally in each `(portal)/layout.tsx`.
+
+### Teacher dashboard "join now" card
+- `dashboard/page.tsx` computes — client-side via `classWindow` over the `schedule` it already receives — the first **scheduled** class that's ongoing/imminent (live ones stay on the "Live now" hero) and renders a pulsing red **"… is starting now / starts in N min — Join & start →"** banner above the hero row. No server change. (Student side needs none: under the confirmed rule students join only when live, which the existing live card already renders.)
+
+### Build status
+- `npx tsc --noEmit` → **0 errors**; ESLint clean on all touched/new files. No new collection, no new dep, no composite index (single-equality / `in` queries + in-memory filter).
+
+### Heads-up
+1. **Timing is local-clock per viewer** (parses wall-clock without `Z`). This is the intended semantic and is independent of the server's UTC frame used elsewhere; the captured `availability.timezone` is still not used for cross-TZ conversion.
+2. **Reminders poll every 30s** globally (two cheap endpoints). With the ~2.5-min imminent window the popup appears within ~30s of the 2-min mark.
+3. **Staggering is still best-effort** for true simultaneous proposals (two teachers' lazy auto-propose racing), but including proposals in the occupied set makes ordinary sequential use reliable.
+4. **No background cron**: "ongoing" is computed on read; status only flips to `live` when the teacher actually joins the classroom (existing auto-start). A scheduled class nobody joins simply stops showing as ongoing once its window passes.
 
 ---
 

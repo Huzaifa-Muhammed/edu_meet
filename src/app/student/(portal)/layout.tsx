@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { StudentTopbar } from "@/components/student/student-topbar";
 import { StudentSidenav } from "@/components/student/student-sidenav";
 import { StudentRightSidebar } from "@/components/student/student-right-sidebar";
+import { ClassReminderPopup } from "@/components/student/class-reminder-popup";
 
 export default function StudentPortalLayout({
   children,
@@ -30,6 +31,7 @@ export default function StudentPortalLayout({
           {showRightRail && <StudentRightSidebar />}
         </div>
       </div>
+      <ClassReminderPopup />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { TeacherTopbar } from "@/components/teacher/teacher-topbar";
 import { TeacherSidenav } from "@/components/teacher/teacher-sidenav";
 import { TeacherRightSidebar } from "@/components/teacher/teacher-right-sidebar";
 import { CoverRequestPopup } from "@/components/teacher/cover-request-popup";
+import { ClassReminderPopup } from "@/components/teacher/class-reminder-popup";
 
 export default function TeacherPortalLayout({
   children,
@@ -25,6 +26,7 @@ export default function TeacherPortalLayout({
         </div>
       </div>
       <CoverRequestPopup />
+      <ClassReminderPopup />
     </div>
   );
 }
