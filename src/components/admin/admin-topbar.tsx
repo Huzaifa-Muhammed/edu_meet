@@ -15,6 +15,11 @@ function titlesFor(pathname: string): { title: string; sub: string } {
       title: "Teacher Applications",
       sub: "Review and approve new teacher signups",
     };
+  if (pathname.startsWith("/admin/course-content"))
+    return {
+      title: "Course Content",
+      sub: "Upload per-subject material (Excel of Drive documents)",
+    };
   if (pathname.startsWith("/admin/leave-requests"))
     return {
       title: "Teacher Leave Requests",

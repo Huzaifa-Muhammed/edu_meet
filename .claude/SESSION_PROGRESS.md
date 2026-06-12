@@ -4,7 +4,40 @@
 
 ---
 
-## Last Updated: 2026-06-12 (session 11 — AI-schedule enhancements: robust same-subject staggering + 2-min class reminders + dashboard "join now")
+## Last Updated: 2026-06-12 (session 12 — transcript-download popup fix + real end-of-class insights + admin course-content (Excel→Drive docs) with one-click present-to-slides)
+
+---
+
+## Session 12 (2026-06-12) — Transcript download fix · real wrap-up insights · course-content library (Excel → Drive docs → slides)
+
+Three asks: (1) the teacher's end-of-class **"Download transcript" did nothing**; (2) the end-of-class **wrap-up insights were hardcoded dummy values**; (3) a new **course-content pipeline** — admin uploads per-subject Excel files (rows of Google-Drive doc links), teachers see their subject's content in the live-class Resources panel, can add docs to the class, and **present a Drive PDF via the existing Slides pipeline**. Two product decisions confirmed via `AskUserQuestion`: **SheetJS** for Excel parsing and **auto-import Drive PDF → slides** (server proxy).
+
+### Transcript download — popup-blocker root cause (not a capture bug)
+- The handler did `await flushTranscript() → await fetchTranscript() → window.open()`. Opening the print window **after** `await` means the browser no longer treats it as user-initiated → it **silently blocks** it (`w` is null, function returns). The button "worked" but nothing opened.
+- **Fix** (`src/lib/transcript/client.ts`): new **`openPrintWindow()`** opens a blank window **synchronously inside the click** (with a "Preparing…" placeholder); `downloadTranscriptPdf(meta, segments, win?)` now accepts that pre-opened window and uses `document.open()` to swap in the real content. Applied in **`end-summary-modal.tsx`** (teacher) and **`class-recap.tsx`** (student — same latent bug); both close the window + toast on empty/error and prompt to allow pop-ups if blocked.
+
+### Real end-of-class insights (was 45:00 / 13 / 3 / 78% / 82% hardcoded)
+- New **`GET /api/meetings/[id]/insights`** (host-only) + **`meetingsService.getInsights`**: **duration** (`startedAt`→now, elapsed), **attended/enrolled** (distinct `join` attendance events vs `classroom.studentIds`), **questions/answered** (`classQuestions` scoped to this meeting).
+- **Comprehension** + **participation** come from **live in-room pubsub** (`REACTION`/`HAND_RAISE`) — those are **not persisted server-side** (the student's `POST /classrooms/[id]/reactions` endpoint doesn't even exist). Aggregated in `ClassroomShell` (inside the meeting provider): comprehension = latest `ok`/`confused` per student; participation = distinct students who raised a hand or reacted, over `attended`. Passed into `EndSummaryModal` as props. **Any metric with no signal shows `—`** instead of a fake number.
+
+### Course content — admin Excel → teacher Resources → present in slides
+- **Excel schema** (`_design/further_math.xlsx`): columns **Topic · Grade · syllabus · Link** (a Google-Drive *view* link per topic), one file per subject.
+- **New collection `courseContent`** (`Collections.COURSE_CONTENT`), doc id = normalized subject key (re-upload replaces). **`courseContentService`**: `upsert` / `listAll` / `getByKey` / `getForSubject(subjectId, subjectName)` (tries id-key → name-key → normalized-name scan) / `remove`.
+- **Admin** (`/admin/course-content` + 📚 sidenav + topbar title): subject picker (FALLBACK_SUBJECTS + "Other"), `.xlsx` drop **parsed in-browser via SheetJS** (`import("xlsx")`; header auto-detect w/ positional fallback; keeps only rows with a topic + http link), preview table, Save → **`POST /api/admin/course-content`** (zod, admin-only). List/replace/delete published subjects. Also: **`GET`** (listAll) + **`DELETE ?key=`**.
+- **Teacher fetch**: **`GET /api/classrooms/[id]/course-content`** resolves the classroom's subject (`resolveSubjectName`) → matching content doc → `{ subjectName, available, items[] }`. Any participant can read.
+- **Resources panel** (`left-panel.tsx`): the dashed **"Add link" → "Import content"** (FolderInput icon; "Add custom link" kept as a small secondary action). Opens **`ImportContentModal`** (in new `course-content-browser.tsx`) listing the subject's docs with **open-in-Drive** + **Add to class** (posts a classroom resource link; tracks added state).
+- **Present a Drive PDF**: **`GET /api/meetings/[id]/slides/drive?src=`** (host-only) downloads the Drive file server-side (handles the large-file "confirm" interstitial; Drive blocks direct cross-origin fetch) and returns the bytes. The **slide presenter** (empty-state picker **and** Manage panel) renders the shared **`CourseContentList`** with a **Present** button → `importDoc` fetches the proxy → wraps as a `File` → feeds the **existing pdfjs split → upload pipeline** → presents live. `SlidePresenter` now takes `classroomId` (passed from `main-area.tsx`).
+
+### Build status
+- `npx tsc --noEmit` → **0 errors**. All new files ESLint-clean. Remaining lint errors are **pre-existing** (`main-area.tsx` `Date.now` in `useMemo`; `slide-presenter.tsx` slide-sync `setState`-in-effect / `redraw`-before-declare) — untouched.
+- **One new dep: `xlsx` (SheetJS) 0.18.5.** One new collection `courseContent` (single-doc gets, no composite index).
+
+### Heads-up
+1. **Drive auto-import needs "Anyone with the link"** sharing. Restricted/very-large files fail with a clear error → teacher can still open-in-Drive + upload manually.
+2. **Subject matching** keys off the classroom's `subjectId`/`subjectName`: known subjects match by id, custom ones (e.g. "Further Math") by normalized name — name the admin upload to match how the classroom stores its subject.
+3. **Comprehension/participation reflect the live moment of ending** (in-room pubsub); a student who reacted then left still counts; no signals → `—`. `attended/enrolled` can read e.g. `5/3` when subject-interest (non-enrolled) students attend — real, not a bug.
+4. **Not runtime-tested** here (static tsc/lint only): the live Drive fetch and Firebase writes warrant a manual pass — upload `further_math.xlsx` as "Further Math", set a classroom's subject to match, then Import content / Present in a live class.
+5. **~6s transcript tail risk** unchanged from session 10 (Bearer auth blocks `sendBeacon`); the teacher modal force-flushes so their copy is complete.
 
 ---
 

@@ -263,6 +263,7 @@ export function MainArea({
               {slidesOn && (
                 <SlidePresenter
                   meetingId={meetingId}
+                  classroomId={classroomId}
                   canEdit={isMod}
                   onClose={() => setSlidesOn(false)}
                 />

@@ -1,14 +1,33 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { X, Download } from "lucide-react";
 import { toast } from "sonner";
+import api from "@/lib/api/client";
 import {
   flushTranscript,
   fetchTranscript,
   downloadTranscriptPdf,
+  openPrintWindow,
   type TranscriptMeta,
 } from "@/lib/transcript/client";
+
+type Insights = {
+  durationMin: number | null;
+  attended: number;
+  enrolled: number;
+  questions: number;
+  questionsAnswered: number;
+};
+
+function fmtDuration(min?: number | null) {
+  if (min == null) return "—";
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${h}h ${String(m).padStart(2, "0")}m`;
+}
 
 const SESSION_ISSUES = [
   { id: "audio", icon: "🎙", label: "Audio drops", sub: "students couldn't hear" },
@@ -25,20 +44,56 @@ export function EndSummaryModal({
   onConfirm,
   meetingId,
   transcriptMeta,
+  engagedStudents,
+  comprehension,
 }: {
   open: boolean;
   onClose: () => void;
   onConfirm: (args: { remarks: string; issues: string[]; impact: string }) => void;
   meetingId?: string;
   transcriptMeta?: TranscriptMeta;
+  /** Distinct students who raised a hand or sent a reaction (live signal). */
+  engagedStudents?: number;
+  /** Latest comprehension signals from the room (live), or null if none. */
+  comprehension?: { understood: number; confused: number } | null;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [impact, setImpact] = useState<"low" | "med" | "high" | null>(null);
   const [remarks, setRemarks] = useState("");
   const [downloading, setDownloading] = useState(false);
 
+  const insightsQ = useQuery<Insights>({
+    queryKey: ["meeting-insights", meetingId],
+    queryFn: () =>
+      api.get(`/meetings/${meetingId}/insights`) as unknown as Promise<Insights>,
+    enabled: open && !!meetingId,
+  });
+  const ins = insightsQ.data;
+
+  const compPct =
+    comprehension && comprehension.understood + comprehension.confused > 0
+      ? Math.round(
+          (comprehension.understood /
+            (comprehension.understood + comprehension.confused)) *
+            100,
+        )
+      : null;
+  const partPct =
+    ins && ins.attended > 0 && engagedStudents != null
+      ? Math.min(100, Math.round((engagedStudents / ins.attended) * 100))
+      : null;
+
+  const loadingVal = insightsQ.isLoading ? "…" : "—";
+
   const downloadTranscript = async () => {
     if (!meetingId || downloading) return;
+    // Open the print window synchronously (inside the click) so the popup
+    // blocker doesn't kill it — opening after the awaits below would be blocked.
+    const w = openPrintWindow();
+    if (!w) {
+      toast.error("Please allow pop-ups to download the transcript.");
+      return;
+    }
     setDownloading(true);
     try {
       // Drain anything still buffered on this device, then pull the canonical
@@ -46,11 +101,13 @@ export function EndSummaryModal({
       await flushTranscript(meetingId);
       const t = await fetchTranscript(meetingId);
       if (!t.segments.length) {
+        w.close();
         toast.info("No transcript was captured for this class.");
         return;
       }
-      downloadTranscriptPdf(transcriptMeta ?? { classroomName: "Class" }, t.segments);
+      downloadTranscriptPdf(transcriptMeta ?? { classroomName: "Class" }, t.segments, w);
     } catch {
+      w.close();
       toast.error("Couldn't load the transcript.");
     } finally {
       setDownloading(false);
@@ -105,13 +162,40 @@ export function EndSummaryModal({
           </button>
         </div>
 
-        {/* KPIs */}
+        {/* KPIs — real session data (live-signal metrics show "—" when no
+            signals were recorded) */}
         <div className="flex flex-wrap bg-white">
-          <SumKpi val="45:00" label="Duration" sub="actual" />
-          <SumKpi val="13" label="Students" sub="attended" />
-          <SumKpi val="3" label="Questions" sub="polled" />
-          <SumKpi val="78%" label="Comp." sub="understood" />
-          <SumKpi val="82%" label="Participation" sub="hands + answers" />
+          <SumKpi
+            val={ins ? fmtDuration(ins.durationMin) : loadingVal}
+            label="Duration"
+            sub="elapsed"
+          />
+          <SumKpi
+            val={
+              ins
+                ? ins.enrolled
+                  ? `${ins.attended}/${ins.enrolled}`
+                  : String(ins.attended)
+                : loadingVal
+            }
+            label="Students"
+            sub="attended"
+          />
+          <SumKpi
+            val={ins ? String(ins.questions) : loadingVal}
+            label="Questions"
+            sub={ins ? `${ins.questionsAnswered} answered` : "asked"}
+          />
+          <SumKpi
+            val={compPct != null ? `${compPct}%` : "—"}
+            label="Comp."
+            sub="understood"
+          />
+          <SumKpi
+            val={partPct != null ? `${partPct}%` : "—"}
+            label="Participation"
+            sub="hands + reactions"
+          />
         </div>
 
         {/* Body */}

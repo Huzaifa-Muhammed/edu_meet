@@ -42,4 +42,5 @@ export const Collections = {
   LEAVE_REQUESTS: "leaveRequests",
   COVER_REQUESTS: "coverRequests",
   TRANSCRIPTS: "transcripts",
+  COURSE_CONTENT: "courseContent",
 } as const;

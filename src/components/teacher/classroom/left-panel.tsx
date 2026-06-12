@@ -11,9 +11,11 @@ import {
   Check,
   ExternalLink,
   Link as LinkIcon,
+  FolderInput,
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api/client";
+import { ImportContentModal } from "./course-content-browser";
 import type { ClassNote } from "@/server/services/class-notes.service";
 import type { AgendaItem } from "@/server/services/agenda.service";
 import type { ResourceItem } from "@/server/services/resources.service";
@@ -396,6 +398,7 @@ export function ResourcesTab({
 }) {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
 
@@ -448,13 +451,28 @@ export function ResourcesTab({
       <ResLabel>Links &amp; documents</ResLabel>
 
       {canEdit && !adding && (
-        <button
-          onClick={() => setAdding(true)}
-          className="mb-2 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-bd px-2 py-1.5 text-[10px] font-semibold text-t3 hover:border-acc hover:text-acc"
-        >
-          <Plus className="h-3 w-3" />
-          Add link
-        </button>
+        <>
+          <button
+            onClick={() => setImportOpen(true)}
+            className="mb-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-bd px-2 py-2 text-[10px] font-semibold text-t2 hover:border-acc hover:text-acc"
+          >
+            <FolderInput className="h-3.5 w-3.5" />
+            Import content
+          </button>
+          <button
+            onClick={() => setAdding(true)}
+            className="mb-2 flex w-full items-center justify-center gap-1 text-[10px] font-medium text-t3 hover:text-acc"
+          >
+            <Plus className="h-3 w-3" />
+            Add custom link
+          </button>
+        </>
+      )}
+      {importOpen && (
+        <ImportContentModal
+          classroomId={classroomId}
+          onClose={() => setImportOpen(false)}
+        />
       )}
       {canEdit && adding && (
         <div className="mb-2 rounded-lg border border-bd bg-panel p-2">

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { usePubSub } from "@videosdk.live/react-sdk";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -215,6 +216,58 @@ function ClassroomShell({
 }) {
   const { muteAll, camOffAll } = useModerationBroadcast();
 
+  // Live in-room signals for the end-of-class wrap-up. Reactions/hands flow
+  // over pubsub and aren't persisted server-side, so we aggregate them here
+  // (inside the meeting provider) and hand them to the summary modal.
+  const { messages: reactionMsgs } = usePubSub("REACTION");
+  const { messages: handMsgs } = usePubSub("HAND_RAISE");
+
+  const liveSignals = useMemo(() => {
+    const engaged = new Set<string>();
+    for (const m of handMsgs) {
+      try {
+        const p = JSON.parse(m.message as unknown as string) as { uid?: string };
+        if (p.uid) engaged.add(p.uid);
+      } catch {
+        // skip malformed
+      }
+    }
+    // Latest reaction per student decides their comprehension signal.
+    const latest = new Map<
+      string,
+      { type: "ok" | "confused"; state?: string; at: number }
+    >();
+    for (const m of reactionMsgs) {
+      try {
+        const p = JSON.parse(m.message as unknown as string) as {
+          uid?: string;
+          type?: "ok" | "confused";
+          state?: "active" | "cleared";
+          at?: number;
+        };
+        if (!p.uid || !p.type) continue;
+        engaged.add(p.uid);
+        const prev = latest.get(p.uid);
+        const at = p.at ?? 0;
+        if (!prev || at >= prev.at) latest.set(p.uid, { type: p.type, state: p.state, at });
+      } catch {
+        // skip malformed
+      }
+    }
+    let understood = 0;
+    let confused = 0;
+    for (const r of latest.values()) {
+      if (r.state === "cleared") continue;
+      if (r.type === "ok") understood += 1;
+      else if (r.type === "confused") confused += 1;
+    }
+    return {
+      engagedStudents: engaged.size,
+      comprehension:
+        understood + confused > 0 ? { understood, confused } : null,
+    };
+  }, [reactionMsgs, handMsgs]);
+
   const doMuteAll = () => {
     muteAll();
     setMuteAllOn(true);
@@ -278,6 +331,8 @@ function ClassroomShell({
         onClose={() => setEndOpen(false)}
         onConfirm={onConfirmEnd}
         meetingId={meetingId}
+        engagedStudents={liveSignals.engagedStudents}
+        comprehension={liveSignals.comprehension}
         transcriptMeta={{
           classroomName,
           subjectName: classroomSubject,

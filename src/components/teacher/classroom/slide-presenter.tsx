@@ -16,6 +16,10 @@ import {
 } from "lucide-react";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import api from "@/lib/api/client";
+import {
+  CourseContentList,
+  type CourseDoc,
+} from "./course-content-browser";
 
 /* ─── Types ─── */
 
@@ -46,10 +50,12 @@ type Stroke = {
  *  SLIDE_PEN pubsub. */
 export function SlidePresenter({
   meetingId,
+  classroomId,
   onClose,
   canEdit = true,
 }: {
   meetingId: string;
+  classroomId?: string;
   onClose: () => void;
   canEdit?: boolean;
 }) {
@@ -72,6 +78,7 @@ export function SlidePresenter({
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [importingLink, setImportingLink] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -285,6 +292,50 @@ export function SlidePresenter({
     }
   };
 
+  /** Pull a course-content Drive PDF through the host-only server proxy (Drive
+   *  blocks direct cross-origin fetches), then hand it to the same split +
+   *  upload pipeline as a local file. */
+  const importDoc = async (doc: CourseDoc) => {
+    if (uploading || importingLink) return;
+    setUploadError(null);
+    setImportingLink(doc.link);
+    setUploading(true);
+    setUploadStatus(`Fetching "${doc.topic}" from Drive…`);
+    try {
+      const token = await getFirebaseAuth().currentUser?.getIdToken();
+      const res = await fetch(
+        `/api/meetings/${meetingId}/slides/drive?src=${encodeURIComponent(doc.link)}`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(
+          err?.error?.message ?? `Couldn't fetch from Drive (${res.status})`,
+        );
+      }
+      const ct = res.headers.get("content-type") ?? "";
+      if (!ct.includes("pdf") && !ct.includes("image")) {
+        throw new Error(
+          "That Drive file isn't a PDF or image — only those can be presented.",
+        );
+      }
+      const blob = await res.blob();
+      const isPdf = ct.includes("pdf");
+      const file = new File(
+        [blob],
+        `${doc.topic.replace(/[^\w\- ]+/g, "").trim() || "document"}.${isPdf ? "pdf" : "png"}`,
+        { type: isPdf ? "application/pdf" : ct || "image/png" },
+      );
+      await addFiles([file]);
+    } catch (e) {
+      setUploadError(e instanceof Error ? e.message : "Import failed");
+    } finally {
+      setImportingLink(null);
+      setUploading(false);
+      setUploadStatus(null);
+    }
+  };
+
   const removeSlide = async (slideId: string) => {
     try {
       await api.delete(`/meetings/${meetingId}/slides/${slideId}`);
@@ -325,6 +376,9 @@ export function SlidePresenter({
             uploading={uploading}
             uploadStatus={uploadStatus}
             uploadError={uploadError}
+            classroomId={classroomId}
+            onImportDoc={importDoc}
+            importingLink={importingLink}
           />
         ) : (
           <div className="flex flex-1 items-center justify-center text-[12px] text-white/50">
@@ -487,6 +541,9 @@ export function SlidePresenter({
               uploadError={uploadError}
               activeIdx={idx}
               onPickActive={setIdx}
+              classroomId={classroomId}
+              onImportDoc={importDoc}
+              importingLink={importingLink}
             />
           </div>
         )}
@@ -558,11 +615,17 @@ function SlideSourcePicker({
   uploading,
   uploadStatus,
   uploadError,
+  classroomId,
+  onImportDoc,
+  importingLink,
 }: {
   onUpload: (files: FileList | File[]) => void;
   uploading: boolean;
   uploadStatus: string | null;
   uploadError: string | null;
+  classroomId?: string;
+  onImportDoc: (doc: CourseDoc) => void;
+  importingLink: string | null;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -621,6 +684,25 @@ function SlideSourcePicker({
         </div>
       </div>
 
+      {classroomId && (
+        <div className="w-full max-w-[560px] rounded-[14px] border border-white/10 bg-white/5 p-4">
+          <p className="mb-2 text-[12px] font-semibold text-white/80">
+            Or import from course content
+          </p>
+          <CourseContentList
+            classroomId={classroomId}
+            dark
+            renderAction={(doc) => (
+              <PresentBtn
+                onClick={() => onImportDoc(doc)}
+                busy={importingLink === doc.link}
+                disabled={uploading}
+              />
+            )}
+          />
+        </div>
+      )}
+
       {uploadError && (
         <p className="max-w-[500px] rounded-md bg-red-500/20 px-3 py-1.5 text-[11px] text-red-200">
           {uploadError}
@@ -631,6 +713,32 @@ function SlideSourcePicker({
         pages automatically.
       </p>
     </div>
+  );
+}
+
+/** Small "Present" action button used by the course-content import lists. */
+function PresentBtn({
+  onClick,
+  busy,
+  disabled,
+}: {
+  onClick: () => void;
+  busy: boolean;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={busy || disabled}
+      className="flex flex-shrink-0 items-center gap-1 rounded-md bg-blue-500/90 px-2 py-1 text-[10px] font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+    >
+      {busy ? (
+        <Loader2 className="h-3 w-3 animate-spin" />
+      ) : (
+        <Upload className="h-3 w-3" />
+      )}
+      {busy ? "Importing…" : "Present"}
+    </button>
   );
 }
 
@@ -645,6 +753,9 @@ function ManageSlides({
   uploadError,
   activeIdx,
   onPickActive,
+  classroomId,
+  onImportDoc,
+  importingLink,
 }: {
   slides: ServerSlide[];
   onAdd: (files: FileList | File[]) => void;
@@ -654,6 +765,9 @@ function ManageSlides({
   uploadError: string | null;
   activeIdx: number;
   onPickActive: (idx: number) => void;
+  classroomId?: string;
+  onImportDoc: (doc: CourseDoc) => void;
+  importingLink: string | null;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   return (
@@ -724,6 +838,25 @@ function ManageSlides({
           </div>
         ))}
       </div>
+
+      {classroomId && (
+        <div className="mt-6 rounded-[12px] border border-white/10 bg-white/5 p-4">
+          <p className="mb-2 text-[12px] font-semibold text-white/80">
+            Import from course content
+          </p>
+          <CourseContentList
+            classroomId={classroomId}
+            dark
+            renderAction={(doc) => (
+              <PresentBtn
+                onClick={() => onImportDoc(doc)}
+                busy={importingLink === doc.link}
+                disabled={uploading}
+              />
+            )}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -81,14 +81,32 @@ function clock(ts: number) {
   }
 }
 
+/** Opens a blank print window synchronously so it isn't killed by the popup
+ *  blocker. Must be called directly inside a click handler — BEFORE any
+ *  `await` — otherwise the browser no longer treats it as user-initiated and
+ *  silently blocks it. Writes a placeholder; fill it later via
+ *  `downloadTranscriptPdf(meta, segments, win)`. Returns null if blocked. */
+export function openPrintWindow(): Window | null {
+  const w = window.open("", "_blank", "width=820,height=920");
+  if (w) {
+    w.document.write(
+      '<!doctype html><meta charset="utf-8"><title>Preparing…</title>' +
+        '<body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#666;padding:40px">Preparing transcript…</body>',
+    );
+  }
+  return w;
+}
+
 /** Opens a print-friendly window with the transcript and triggers the
  *  browser's print dialog (Save as PDF). Dependency-free — mirrors the
- *  class-recap download. */
+ *  class-recap download. Pass a pre-opened `win` (from `openPrintWindow`) when
+ *  the content is fetched asynchronously, so the popup survives the await. */
 export function downloadTranscriptPdf(
   meta: TranscriptMeta,
   segments: TranscriptSegment[],
+  win?: Window | null,
 ) {
-  const w = window.open("", "_blank", "width=820,height=920");
+  const w = win ?? window.open("", "_blank", "width=820,height=920");
   if (!w) return;
 
   const dateLabel = meta.date
@@ -135,6 +153,8 @@ export function downloadTranscriptPdf(
     ${rows}
     <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
   </body></html>`;
+  // document.open() clears any placeholder written by openPrintWindow().
+  w.document.open();
   w.document.write(html);
   w.document.close();
 }

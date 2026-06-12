@@ -6,7 +6,11 @@ import { Download, ArrowLeft, FileText, ListChecks, MessageCircleQuestion, Capti
 import { format } from "date-fns";
 import { toast } from "sonner";
 import api from "@/lib/api/client";
-import { fetchTranscript, downloadTranscriptPdf } from "@/lib/transcript/client";
+import {
+  fetchTranscript,
+  downloadTranscriptPdf,
+  openPrintWindow,
+} from "@/lib/transcript/client";
 
 export type ClassRecap = {
   classroomName: string;
@@ -103,10 +107,18 @@ export function ClassRecapScreen({
 
   const downloadTranscript = async () => {
     if (loadingTranscript) return;
+    // Open the print window synchronously (inside the click) so the popup
+    // blocker doesn't kill it — opening after the await would be blocked.
+    const w = openPrintWindow();
+    if (!w) {
+      toast.error("Please allow pop-ups to download the transcript.");
+      return;
+    }
     setLoadingTranscript(true);
     try {
       const t = await fetchTranscript(meetingId);
       if (!t.segments.length) {
+        w.close();
         toast.info("No transcript was captured for this class.");
         return;
       }
@@ -118,8 +130,10 @@ export function ClassRecapScreen({
           date: r?.date,
         },
         t.segments,
+        w,
       );
     } catch {
+      w.close();
       toast.error("Couldn't load the transcript.");
     } finally {
       setLoadingTranscript(false);

@@ -305,6 +305,71 @@ export const meetingsService = {
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   },
 
+  /** Real end-of-class insights from persisted data: elapsed duration,
+   *  attendance vs enrolment, and questions asked/answered this session.
+   *  (Comprehension/participation come from live in-room pubsub signals which
+   *  aren't persisted server-side — those are computed client-side and merged
+   *  into the wrap-up modal.) */
+  async getInsights(meetingId: string) {
+    const mDoc = await adminDb
+      .collection(Collections.MEETINGS)
+      .doc(meetingId)
+      .get();
+    if (!mDoc.exists) throw notFound("Meeting");
+    const m = mDoc.data() ?? {};
+    const classroomId = m.classroomId as string;
+    const teacherId = m.teacherId as string | undefined;
+
+    const [classDoc, attendance, qSnap] = await Promise.all([
+      adminDb.collection(Collections.CLASSROOMS).doc(classroomId).get(),
+      this.getAttendance(meetingId),
+      adminDb
+        .collection(Collections.CLASS_QUESTIONS)
+        .where("classroomId", "==", classroomId)
+        .get(),
+    ]);
+
+    const enrolled =
+      ((classDoc.data()?.studentIds as string[] | undefined) ?? []).length;
+
+    // Distinct students who joined (self-reported attendance events).
+    const joinUids = new Set<string>();
+    for (const e of attendance as { uid?: string; type?: string }[]) {
+      if (e.type === "join" && e.uid) joinUids.add(e.uid);
+    }
+    let attended = joinUids.size;
+    if (attended === 0) {
+      // Fall back to the participant roster (excluding the host) if no
+      // attendance events were logged.
+      attended = ((m.participantIds as string[] | undefined) ?? []).filter(
+        (u) => u !== teacherId,
+      ).length;
+    }
+
+    // Questions asked during THIS session (carry meetingId when asked live).
+    const qs = qSnap.docs.map(
+      (d) =>
+        d.data() as {
+          meetingId?: string | null;
+          status?: string;
+          aiAnswer?: string | null;
+        },
+    );
+    const mine = qs.filter((q) => q.meetingId === meetingId);
+    const questions = mine.length;
+    const questionsAnswered = mine.filter(
+      (q) => q.status === "answered" || !!q.aiAnswer,
+    ).length;
+
+    const startMs = m.startedAt ? Date.parse(m.startedAt as string) : NaN;
+    const endMs = m.endedAt ? Date.parse(m.endedAt as string) : Date.now();
+    const durationMin = Number.isFinite(startMs)
+      ? Math.max(0, Math.round((endMs - startMs) / 60000))
+      : null;
+
+    return { durationMin, attended, enrolled, questions, questionsAnswered };
+  },
+
   /** Banned student files a rejoin request. Idempotent — repeated calls
    *  refresh the timestamp + reset status to pending. Returns the stored
    *  status. Throws notFound if the meeting doesn't exist; returns
