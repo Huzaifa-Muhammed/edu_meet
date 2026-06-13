@@ -355,7 +355,7 @@ export function SlidePresenter({
   if (slides.length === 0) {
     return (
       <div
-        className="absolute inset-0 z-[8] flex flex-col"
+        className="absolute inset-0 z-[8] flex flex-col overflow-hidden"
         style={{ background: "#0F0E0C" }}
       >
         <div className="flex flex-shrink-0 items-center gap-2.5 border-b border-white/[.06] bg-black/35 px-3 py-1.5">
@@ -371,15 +371,17 @@ export function SlidePresenter({
           </button>
         </div>
         {canEdit ? (
-          <SlideSourcePicker
-            onUpload={addFiles}
-            uploading={uploading}
-            uploadStatus={uploadStatus}
-            uploadError={uploadError}
-            classroomId={classroomId}
-            onImportDoc={importDoc}
-            importingLink={importingLink}
-          />
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <SlideSourcePicker
+              onUpload={addFiles}
+              uploading={uploading}
+              uploadStatus={uploadStatus}
+              uploadError={uploadError}
+              classroomId={classroomId}
+              onImportDoc={importDoc}
+              importingLink={importingLink}
+            />
+          </div>
         ) : (
           <div className="flex flex-1 items-center justify-center text-[12px] text-white/50">
             Teacher hasn&apos;t started slides yet.
@@ -632,7 +634,7 @@ function SlideSourcePicker({
   const openPicker = () => inputRef.current?.click();
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-6 p-8 text-white">
+    <div className="flex min-h-full w-full flex-col items-center justify-center gap-5 p-6 text-white">
       <div className="text-center">
         <p className="text-[14px] font-semibold">Upload slides to present</p>
         <p className="mt-1 text-[11px] text-white/50">
@@ -689,17 +691,19 @@ function SlideSourcePicker({
           <p className="mb-2 text-[12px] font-semibold text-white/80">
             Or import from course content
           </p>
-          <CourseContentList
-            classroomId={classroomId}
-            dark
-            renderAction={(doc) => (
-              <PresentBtn
-                onClick={() => onImportDoc(doc)}
-                busy={importingLink === doc.link}
-                disabled={uploading}
-              />
-            )}
-          />
+          <div className="max-h-[220px] overflow-y-auto pr-1">
+            <CourseContentList
+              classroomId={classroomId}
+              dark
+              renderAction={(doc) => (
+                <PresentBtn
+                  onClick={() => onImportDoc(doc)}
+                  busy={importingLink === doc.link}
+                  disabled={uploading}
+                />
+              )}
+            />
+          </div>
         </div>
       )}
 

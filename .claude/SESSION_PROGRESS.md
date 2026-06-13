@@ -4,7 +4,45 @@
 
 ---
 
-## Last Updated: 2026-06-12 (session 12 — transcript-download popup fix + real end-of-class insights + admin course-content (Excel→Drive docs) with one-click present-to-slides)
+## Last Updated: 2026-06-13 (session 13 — fixed Drive→slides presentation end-to-end: PDF content-type sniffing, slide-presenter overflow UI, and the real blocker — slides now stored on Cloudinary (Firebase Storage was never provisioned) with auto-purge on class end)
+
+---
+
+## Session 13 (2026-06-13) — Drive→slides presentation fixed end-to-end (content-type sniffing · presenter UI overflow · Cloudinary slide storage + auto-purge)
+
+Continuation of session 12's course-content → "Present a Drive PDF" feature, which **had never actually worked at runtime** (session 12 was static-tested only). Reported symptoms, in order discovered: (1) "only PDF and images can be presented" error on a real PDF; (2) UI showed **floating blue "Present" buttons over the live video**; (3) **500 Internal Server Error** on the slide upload after the PDF split correctly into 8 pages. Root-caused all three; the third was the real blocker.
+
+### 1 — "Only PDF/images" error → Drive serves PDFs as `application/octet-stream`
+- The client checked the proxy's `content-type` and rejected anything not `pdf`/`image`. Google Drive's download endpoint commonly serves uploaded PDFs as **`application/octet-stream`**, so valid PDFs were rejected.
+- **Fix** (`src/app/api/meetings/[id]/slides/drive/route.ts`): added **`sniffContentType()`** — reads the file's **leading magic bytes** (`%PDF`, PNG, JPEG, GIF, RIF/WEBP) and tags the response authoritatively, ignoring Drive's untrustworthy header. The "not a PDF/image" rejection moved **server-side** (it can see the real bytes) with a clearer message.
+
+### 2 — Floating "Present" buttons over the video
+- The slide-presenter empty state lives in a **fixed 545px box** but used `h-full … justify-center` with **no internal scroll**. With several course docs the content overflowed; the list rows are translucent (`bg-white/5`, for the dark presenter bg), so over the live video feed only the **solid blue Present buttons** were visible.
+- **Fix** (`slide-presenter.tsx`): `overflow-hidden` on the empty-state root; body wrapped in `min-h-0 flex-1 overflow-y-auto`; picker switched `h-full`→`min-h-full`; course-content list bounded to `max-h-[220px]` scroll so the upload zone always stays in view.
+
+### 3 — 500 on upload → **Firebase Storage was never provisioned** (THE blocker)
+- Diagnosed by reproducing `slidesService.add` against the project's real env: `bucket.exists()` → **false**; `file.save()` → **404 "The specified bucket does not exist."** Neither `notinthemarket.firebasestorage.app` **nor** `.appspot.com` exists — the user **deliberately never enabled Firebase Storage (it's a paid add-on)**. So *every* slide upload (Drive import **and** "Upload from computer") had always 500'd.
+- **Decision (user):** use **Cloudinary** instead — it's already configured in this project (`CLOUDINARY_*` env, used for teacher credentials/resource images) and slides are already PNGs.
+- **Fix** — rewrote **`src/server/services/slides.service.ts`** to store on Cloudinary:
+  - `add()` → **`uploadImageBuffer(buffer, { folder: 'meetings/{id}/slides', filename })`** (`src/server/providers/cloudinary.ts`); stores `secure_url` + **`publicId`** in the `meetingSlides` doc. **`SlideDoc.storagePath` → `publicId`** (legacy Firebase-Storage docs lacking `publicId` are tolerated on delete).
+  - `remove()` → **`destroyImage(publicId)`**.
+  - Storage failures now throw **`badRequest("Couldn't save slide image: …")`** so the real cause surfaces in the presenter's red banner instead of a generic 500.
+  - **Verified live** (outside sandbox): Cloudinary upload+destroy succeed with the project credentials.
+- `getBucket()` in `firebase-admin.ts` is now unused but left in place (harmless).
+
+### 4 — Auto-purge slides on class end (space hygiene, user-requested)
+- Slides are always re-derivable from their source document, so there's no reason to keep them on the CDN after class.
+- **`slidesService.purgeForMeeting(meetingId)`** — deletes every slide's Cloudinary asset + `meetingSlides` doc in one batch; best-effort, idempotent, returns count.
+- Wired into **`meetingsService.end()`** (after status→`ended`) inside a `try/catch` so **cleanup never blocks ending the class**. Next presentation re-derives fresh from Drive → **zero permanent per-class footprint**.
+
+### Build status
+- `npx tsc --noEmit` → **0 errors** throughout. No new deps (Cloudinary + `xlsx` already present). No new collection. No new env. No circular import (`slides.service` doesn't import `meetings.service`).
+
+### Heads-up
+1. **Firebase Storage is intentionally unused** for slides now — Cloudinary holds them. Don't reintroduce `getBucket()` for slides unless Storage gets provisioned.
+2. **Purge is tied to the proper End-Class flow** (`POST /api/meetings/[id]/end`). A teacher who just closes the tab never flips the meeting to `ended`, so those slides linger until that meeting is later ended. A cron sweep for abandoned/stale `ended` meetings could be added if it matters.
+3. **Old slide docs** that pointed at the dead Firebase bucket won't render — re-add them; all new uploads use Cloudinary.
+4. **Drive auto-import still needs "Anyone with the link"** sharing (unchanged from session 12), and native Google Docs links (`docs.google.com/document/...`) aren't handled — uploaded `.pdf` files only. The proxy now returns a clean "couldn't download" message rather than a 500 on any Drive fetch failure.
 
 ---
 

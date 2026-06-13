@@ -3,6 +3,7 @@ import { adminDb } from "@/server/firebase-admin";
 import { Collections } from "@/shared/constants/collections";
 import { notFound } from "@/server/utils/errors";
 import { videosdkService } from "@/server/services/videosdk.service";
+import { slidesService } from "@/server/services/slides.service";
 import type { MeetingCreateInput } from "@/shared/schemas/meeting.schema";
 
 export type TranscriptSegment = { id: string; text: string; ts: number; name?: string };
@@ -104,6 +105,14 @@ export const meetingsService = {
       status: "ended",
       endedAt: new Date().toISOString(),
     });
+
+    // Slides are re-derivable from their source document, so free the Cloudinary
+    // space once the class is over. Best-effort — never block ending the class.
+    try {
+      await slidesService.purgeForMeeting(meetingId);
+    } catch {
+      // ignore — cleanup can be retried, but a class must always be able to end
+    }
 
     const hasSummary =
       !!input?.remarks || (input?.issues && input.issues.length > 0) || !!input?.impact;
