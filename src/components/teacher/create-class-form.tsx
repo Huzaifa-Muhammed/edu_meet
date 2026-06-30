@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
 import api from "@/lib/api/client";
 import { Modal } from "@/components/shared/modal";
+import { SyllabusSelect } from "@/components/shared/syllabus-select";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import type { Subject, Classroom, Meeting } from "@/shared/types/domain";
 import { FALLBACK_SUBJECTS as SHARED_FALLBACK } from "@/shared/constants/subjects";
 
@@ -15,6 +17,7 @@ const FormSchema = z.object({
   name: z.string().min(1, "Class name required").max(100),
   description: z.string().max(500).optional(),
   grade: z.number().int().min(1).max(12),
+  syllabus: z.string().trim().max(120).optional(),
   subjectId: z.string().min(1, "Pick a subject"),
   existingClassroomId: z.string().optional(),
   startNow: z.boolean().optional(),
@@ -34,6 +37,7 @@ export function CreateClassForm({
   onCreated?: (meeting: Meeting) => void;
 }) {
   const qc = useQueryClient();
+  const { user } = useCurrentUser();
   const [mode, setMode] = useState<"new" | "existing">("new");
 
   const subjectsQ = useQuery({
@@ -52,11 +56,23 @@ export function CreateClassForm({
     register,
     handleSubmit,
     reset,
+    control,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(FormSchema) as unknown as import("react-hook-form").Resolver<FormValues>,
-    defaultValues: { grade: 9, startNow: true },
+    defaultValues: { grade: 9, startNow: true, syllabus: "" },
   });
+
+  const syllabus = useWatch({ control, name: "syllabus" });
+
+  // Default the class board to the first board the teacher said they teach
+  // (from their application), once the modal opens and the user has loaded.
+  useEffect(() => {
+    if (open && !syllabus && user?.applicationSyllabi?.[0]) {
+      setValue("syllabus", user.applicationSyllabi[0]);
+    }
+  }, [open, syllabus, user?.applicationSyllabi, setValue]);
 
   const createMutation = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -69,6 +85,7 @@ export function CreateClassForm({
           name: values.name,
           description: values.description,
           grade: values.grade,
+          syllabus: values.syllabus || undefined,
           subjectId: values.subjectId,
           subjectName,
         })) as unknown as Classroom;
@@ -192,6 +209,18 @@ export function CreateClassForm({
                   className="w-full rounded-lg border border-bd bg-surf px-3 py-2 text-sm text-t outline-none focus:border-acc"
                 />
               </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-t2">
+                Exam board (syllabus)
+              </label>
+              <SyllabusSelect
+                value={syllabus}
+                onChange={(v) => setValue("syllabus", v, { shouldDirty: true })}
+              />
+              <p className="mt-1 text-[11px] text-t3">
+                Used to surface matching course content during the live class.
+              </p>
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-t2">Description (optional)</label>

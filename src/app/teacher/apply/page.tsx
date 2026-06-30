@@ -38,6 +38,10 @@ import type {
   CredentialImage,
   TeacherApplication,
 } from "@/shared/types/domain";
+import {
+  SyllabusMultiSelect,
+  GradeMultiSelect,
+} from "@/components/shared/syllabus-select";
 
 export default function TeacherApplyPage() {
   const router = useRouter();
@@ -67,6 +71,8 @@ export default function TeacherApplyPage() {
     resolver: zodResolver(TeacherApplicationCreateSchema),
     defaultValues: {
       subject: "",
+      grades: [],
+      syllabi: [],
       yearsExperience: 0,
       highestDegree: "",
       bio: "",
@@ -75,6 +81,9 @@ export default function TeacherApplyPage() {
       degrees: [],
     },
   });
+
+  const grades = useWatch({ control, name: "grades" }) ?? [];
+  const syllabi = useWatch({ control, name: "syllabi" }) ?? [];
 
   const submitMutation = useMutation({
     mutationFn: (data: TeacherApplicationCreateInput) =>
@@ -190,6 +199,32 @@ export default function TeacherApplyPage() {
                 {errors.subject && (
                   <p className="mt-1 text-xs text-red">{errors.subject.message}</p>
                 )}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-t2">
+                  Grades you teach
+                </label>
+                <p className="mb-2 text-[11px] text-t3">
+                  Select all grade levels you can teach.
+                </p>
+                <GradeMultiSelect
+                  value={grades}
+                  onChange={(g) => setValue("grades", g, { shouldDirty: true })}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-t2">
+                  Exam boards / syllabi you teach
+                </label>
+                <p className="mb-2 text-[11px] text-t3">
+                  e.g. Edexcel, AQA, Cambridge. Pick all that apply.
+                </p>
+                <SyllabusMultiSelect
+                  value={syllabi}
+                  onChange={(s) => setValue("syllabi", s, { shouldDirty: true })}
+                />
               </div>
 
               <div>
@@ -664,6 +699,15 @@ function ApplicationSummary({
     <div className="space-y-4 text-sm">
       <div className="space-y-3">
         <Row label="Subject" value={application.subject} />
+        {application.grades && application.grades.length > 0 && (
+          <Row
+            label="Grades"
+            value={application.grades.join(", ")}
+          />
+        )}
+        {application.syllabi && application.syllabi.length > 0 && (
+          <Row label="Exam boards" value={application.syllabi.join(", ")} />
+        )}
         <Row
           label="Years of experience"
           value={`${application.yearsExperience} years`}

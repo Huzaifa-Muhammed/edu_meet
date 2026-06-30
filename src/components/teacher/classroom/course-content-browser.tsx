@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, X, Loader2, Check, Plus, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api/client";
+import { gradeMatches, syllabusMatches } from "@/shared/constants/curriculum";
 
 export type CourseDoc = {
   topic: string;
@@ -19,6 +20,8 @@ export type CourseContentResponse = {
   fileName: string | null;
   updatedAt: string | null;
   items: CourseDoc[];
+  classroomGrade?: number | null;
+  classroomSyllabus?: string | null;
 };
 
 export function useCourseContent(classroomId: string) {
@@ -45,6 +48,7 @@ export function CourseContentList({
   renderAction: (doc: CourseDoc) => React.ReactNode;
 }) {
   const { data, isLoading } = useCourseContent(classroomId);
+  const [showAll, setShowAll] = useState(false);
 
   const muted = dark ? "text-white/50" : "text-t3";
   const strong = dark ? "text-white" : "text-t";
@@ -54,6 +58,20 @@ export function CourseContentList({
   const badgeCls = dark
     ? "bg-white/10 text-white/70"
     : "bg-panel text-t2";
+  const linkCls = dark ? "text-white/70 hover:text-white" : "text-acc hover:underline";
+
+  // Items matching this class's grade + exam board (blank item metadata is a
+  // wildcard, so unlabeled docs always pass). Defaults to the matched subset;
+  // "Show all" reveals everything so nothing is ever permanently hidden.
+  const matched = useMemo(
+    () =>
+      (data?.items ?? []).filter(
+        (doc) =>
+          gradeMatches(data?.classroomGrade ?? undefined, doc.grade) &&
+          syllabusMatches(data?.classroomSyllabus ?? undefined, doc.syllabus),
+      ),
+    [data?.items, data?.classroomGrade, data?.classroomSyllabus],
+  );
 
   if (isLoading) {
     return <p className={`py-6 text-center text-[11px] ${muted}`}>Loading…</p>;
@@ -68,12 +86,35 @@ export function CourseContentList({
     );
   }
 
+  const hasFilter = matched.length !== data.items.length;
+  const noMatch = matched.length === 0;
+  const shown = showAll || noMatch ? data.items : matched;
+
   return (
     <div className="space-y-1.5">
-      <p className={`text-[10px] uppercase tracking-[.6px] ${muted}`}>
-        {data.subjectName} · {data.items.length} documents
-      </p>
-      {data.items.map((doc, i) => (
+      <div className="flex items-center justify-between gap-2">
+        <p className={`text-[10px] uppercase tracking-[.6px] ${muted}`}>
+          {data.subjectName} · {shown.length} document
+          {shown.length === 1 ? "" : "s"}
+        </p>
+        {hasFilter && !noMatch && (
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className={`text-[10px] font-semibold ${linkCls}`}
+          >
+            {showAll
+              ? `Show match only (${matched.length})`
+              : `Show all (${data.items.length})`}
+          </button>
+        )}
+      </div>
+      {noMatch && (
+        <p className={`text-[10px] leading-[1.5] ${muted}`}>
+          No documents match this class&apos;s grade/board — showing all.
+        </p>
+      )}
+      {shown.map((doc, i) => (
         <div
           key={`${doc.link}-${i}`}
           className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 ${rowCls}`}

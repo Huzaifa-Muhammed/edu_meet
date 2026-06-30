@@ -176,6 +176,12 @@ function ApplicationCard({
           value={`${app.yearsExperience} year${app.yearsExperience === 1 ? "" : "s"}`}
         />
         <Field label="Highest degree" value={app.highestDegree} />
+        {app.grades && app.grades.length > 0 && (
+          <Field label="Grades" value={app.grades.join(", ")} />
+        )}
+        {app.syllabi && app.syllabi.length > 0 && (
+          <Field label="Exam boards" value={app.syllabi.join(", ")} />
+        )}
       </div>
 
       {app.bio && (

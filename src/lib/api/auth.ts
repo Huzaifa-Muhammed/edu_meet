@@ -33,6 +33,7 @@ export async function signUp(
   password: string,
   displayName: string,
   role: "teacher" | "student",
+  extra?: { grade?: number; syllabus?: string },
 ) {
   if (typeof window !== "undefined") {
     sessionStorage.setItem(PENDING_ROLE_KEY, role);
@@ -40,7 +41,12 @@ export async function signUp(
   const cred = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
   await updateProfile(cred.user, { displayName });
   const idToken = await cred.user.getIdToken();
-  return api.post("/auth/session", { idToken, role });
+  return api.post("/auth/session", {
+    idToken,
+    role,
+    grade: extra?.grade,
+    syllabus: extra?.syllabus,
+  });
 }
 
 export async function signOut() {

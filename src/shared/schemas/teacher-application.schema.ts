@@ -29,6 +29,8 @@ export const TeacherDegreeSchema = z.object({
 
 export const TeacherApplicationCreateSchema = z.object({
   subject: z.string().min(2).max(60),
+  grades: z.array(z.number().int().min(1).max(12)).max(12).optional(),
+  syllabi: z.array(z.string().trim().min(1).max(120)).max(20).optional(),
   yearsExperience: z.number().int().min(0).max(60),
   highestDegree: z.string().min(2).max(120),
   bio: z.string().max(600).optional(),

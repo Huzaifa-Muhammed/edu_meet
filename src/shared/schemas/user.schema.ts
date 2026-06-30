@@ -5,6 +5,8 @@ export const UserUpdateSchema = z.object({
   bio: z.string().max(500).optional(),
   subjects: z.array(z.string()).optional(),
   photoUrl: z.string().url().optional(),
+  grade: z.number().int().min(1).max(12).optional(),
+  syllabus: z.string().trim().max(120).optional(),
 });
 
 export const UserCreateSchema = z.object({

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import api from "@/lib/api/client";
 import { SubjectPicker } from "@/components/shared/subject-picker";
+import { SyllabusSelect } from "@/components/shared/syllabus-select";
+import { GRADES } from "@/shared/constants/curriculum";
 import { ChangePasswordForm } from "@/components/shared/change-password-form";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Skeleton, SkeletonText } from "@/components/shared/skeleton";
@@ -46,14 +47,21 @@ export default function StudentProfilePage() {
     register,
     handleSubmit,
     reset,
+    control,
+    setValue,
     formState: { errors, isDirty },
   } = useForm<UserUpdateInput>({
     resolver: zodResolver(UserUpdateSchema) as unknown as import("react-hook-form").Resolver<UserUpdateInput>,
     values: {
       displayName: user?.displayName ?? "",
       bio: user?.bio ?? "",
+      grade: user?.grade,
+      syllabus: user?.syllabus ?? "",
     },
   });
+
+  const grade = useWatch({ control, name: "grade" });
+  const syllabus = useWatch({ control, name: "syllabus" });
 
   const classesQ = useQuery({
     queryKey: ["student", "classes"],
@@ -173,12 +181,47 @@ export default function StudentProfilePage() {
               )}
             </div>
 
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-t2">
+                  Grade
+                </label>
+                <select
+                  value={grade ?? ""}
+                  onChange={(e) =>
+                    setValue(
+                      "grade",
+                      e.target.value ? Number(e.target.value) : undefined,
+                      { shouldDirty: true },
+                    )
+                  }
+                  className="w-full rounded-lg border border-bd bg-surf px-3 py-2 text-sm text-t outline-none focus:border-acc"
+                >
+                  <option value="">Select grade…</option>
+                  {GRADES.map((g) => (
+                    <option key={g} value={g}>
+                      Grade {g}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-t2">
+                  Exam board
+                </label>
+                <SyllabusSelect
+                  value={syllabus}
+                  onChange={(v) => setValue("syllabus", v, { shouldDirty: true })}
+                />
+              </div>
+            </div>
+
             <div>
               <label className="mb-1 block text-xs font-medium text-t2">About me</label>
               <textarea
                 {...register("bio")}
                 rows={3}
-                placeholder="Grade, interests, what you're working on…"
+                placeholder="Interests, what you're working on…"
                 className="w-full rounded-lg border border-bd bg-surf px-3 py-2 text-sm text-t outline-none focus:border-acc"
               />
               {errors.bio && (

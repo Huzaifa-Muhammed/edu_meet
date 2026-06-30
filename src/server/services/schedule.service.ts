@@ -85,6 +85,7 @@ type ClassroomLite = {
   name: string;
   subjectName: string;
   grade: number;
+  syllabus?: string;
   students: number;
 };
 
@@ -438,6 +439,7 @@ async function loadClassrooms(teacherId: string): Promise<ClassroomLite[]> {
       subjectId?: string;
       subjectName?: string;
       grade?: number;
+      syllabus?: string;
       studentIds?: string[];
     };
     return {
@@ -445,6 +447,7 @@ async function loadClassrooms(teacherId: string): Promise<ClassroomLite[]> {
       name: c.name ?? "Class",
       subjectName: c.subjectName ?? resolveSubjectName(c.subjectId ?? "", c.subjectName),
       grade: c.grade ?? 0,
+      syllabus: c.syllabus,
       students: c.studentIds?.length ?? 0,
     };
   });
@@ -533,7 +536,7 @@ async function requestTimetableFromAi(
   const classList = classrooms
     .map(
       (c) =>
-        `- id="${c.id}" | "${c.name}" | subject: ${c.subjectName || "General"} | grade ${c.grade} | ${c.students} students`,
+        `- id="${c.id}" | "${c.name}" | subject: ${c.subjectName || "General"} | grade ${c.grade} | board: ${c.syllabus || "General"} | ${c.students} students`,
     )
     .join("\n");
   const blockList = blocks.length

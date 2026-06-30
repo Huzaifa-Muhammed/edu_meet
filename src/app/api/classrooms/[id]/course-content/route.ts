@@ -22,7 +22,12 @@ export async function GET(
 
     const doc = await adminDb.collection(Collections.CLASSROOMS).doc(id).get();
     if (!doc.exists) throw notFound("Classroom");
-    const c = doc.data() as { subjectId?: string; subjectName?: string };
+    const c = doc.data() as {
+      subjectId?: string;
+      subjectName?: string;
+      grade?: number;
+      syllabus?: string;
+    };
     const subjectName = resolveSubjectName(c.subjectId ?? "", c.subjectName);
 
     const content = await courseContentService.getForSubject(
@@ -36,6 +41,10 @@ export async function GET(
       fileName: content?.fileName ?? null,
       updatedAt: content?.updatedAt ?? null,
       items: content?.items ?? [],
+      // The class's grade + exam board so the client can filter the list to
+      // what's relevant (with a "show all" escape hatch).
+      classroomGrade: c.grade ?? null,
+      classroomSyllabus: c.syllabus ?? null,
     });
   } catch (e) {
     return fail(e);

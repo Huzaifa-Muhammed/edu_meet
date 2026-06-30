@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { signUp } from "@/lib/api/auth";
 import { toast } from "sonner";
+import { SyllabusSelect } from "@/components/shared/syllabus-select";
+import { GRADES } from "@/shared/constants/curriculum";
 
 const SignupSchema = z
   .object({
@@ -16,10 +18,20 @@ const SignupSchema = z
     password: z.string().min(6, "Password must be at least 6 characters"),
     confirmPassword: z.string(),
     role: z.enum(["teacher", "student"]),
+    grade: z.number().int().min(1).max(12).optional(),
+    syllabus: z.string().trim().max(120).optional(),
   })
   .refine((d) => d.password === d.confirmPassword, {
     message: "Passwords don't match",
     path: ["confirmPassword"],
+  })
+  .refine((d) => d.role !== "student" || typeof d.grade === "number", {
+    message: "Select your grade",
+    path: ["grade"],
+  })
+  .refine((d) => d.role !== "student" || !!d.syllabus?.trim(), {
+    message: "Select your exam board",
+    path: ["syllabus"],
   });
 
 type SignupForm = z.infer<typeof SignupSchema>;
@@ -31,16 +43,24 @@ export default function SignupPage() {
   const {
     register,
     handleSubmit,
+    control,
+    setValue,
     formState: { errors },
   } = useForm<SignupForm>({
     resolver: zodResolver(SignupSchema),
     defaultValues: { role: "student" },
   });
 
+  const role = useWatch({ control, name: "role" });
+  const syllabus = useWatch({ control, name: "syllabus" });
+
   async function onSubmit(data: SignupForm) {
     setLoading(true);
     try {
-      await signUp(data.email, data.password, data.displayName, data.role);
+      await signUp(data.email, data.password, data.displayName, data.role, {
+        grade: data.grade,
+        syllabus: data.syllabus,
+      });
       toast.success("Account created!");
       if (data.role === "teacher") {
         router.push("/teacher/apply");
@@ -139,6 +159,51 @@ export default function SignupPage() {
             </option>
           </select>
         </div>
+
+        {role === "student" && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-white/55">
+                Grade
+              </label>
+              <select
+                {...register("grade", { valueAsNumber: true })}
+                defaultValue=""
+                className="w-full rounded-xl border border-white/10 bg-white/[.04] px-3.5 py-3 text-[13px] text-white outline-none transition-colors focus:border-acc focus:bg-white/[.07]"
+              >
+                <option value="" className="bg-[#0E0B1E]">
+                  Select grade…
+                </option>
+                {GRADES.map((g) => (
+                  <option key={g} value={g} className="bg-[#0E0B1E]">
+                    Grade {g}
+                  </option>
+                ))}
+              </select>
+              {errors.grade && (
+                <p className="mt-1.5 text-[11px] text-[#F87171]">
+                  {errors.grade.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-white/55">
+                Exam board
+              </label>
+              <SyllabusSelect
+                value={syllabus}
+                onChange={(v) => setValue("syllabus", v, { shouldValidate: true })}
+                selectClassName="w-full rounded-xl border border-white/10 bg-white/[.04] px-3.5 py-3 text-[13px] text-white outline-none transition-colors focus:border-acc focus:bg-white/[.07]"
+              />
+              {errors.syllabus && (
+                <p className="mt-1.5 text-[11px] text-[#F87171]">
+                  {errors.syllabus.message}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>

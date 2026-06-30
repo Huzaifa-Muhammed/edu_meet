@@ -39,6 +39,8 @@ type UserDoc = {
   /** Legacy alias — older code wrote this. Read both, write only `status`. */
   applicationStatus?: "none" | "pending" | "approved" | "rejected";
   applicationSubject?: string;
+  applicationGrades?: number[];
+  applicationSyllabi?: string[];
   applicationYearsExperience?: number;
   applicationHighestDegree?: string;
   applicationSubmittedAt?: string;
@@ -93,6 +95,8 @@ function userDocToApplication(uid: string, u: UserDoc): TeacherApplication | nul
     email: u.email ?? "",
     displayName,
     subject,
+    grades: u.applicationGrades,
+    syllabi: u.applicationSyllabi,
     yearsExperience,
     highestDegree,
     bio,
@@ -155,6 +159,8 @@ export const teacherApplicationsService = {
       status: "pending" as const,
       applicationStatus: "pending" as const,
       applicationSubject: input.subject,
+      applicationGrades: input.grades ?? [],
+      applicationSyllabi: input.syllabi ?? [],
       applicationYearsExperience: input.yearsExperience,
       applicationHighestDegree: input.highestDegree,
       applicationSubmittedAt: submittedAt,

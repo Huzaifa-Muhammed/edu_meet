@@ -4,6 +4,8 @@ export const ClassroomCreateSchema = z.object({
   subjectId: z.string().min(1),
   subjectName: z.string().min(1).max(100).optional(),
   grade: z.number().int().min(1).max(12),
+  /** Exam board / syllabus this class follows (e.g. Edexcel, AQA). */
+  syllabus: z.string().trim().max(120).optional(),
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
 });

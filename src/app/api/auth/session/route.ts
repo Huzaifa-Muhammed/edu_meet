@@ -30,6 +30,14 @@ export async function POST(req: NextRequest) {
         // Canonical field is `status`; legacy docs sometimes used
         // `applicationStatus` — readers should accept either.
         status: role === "teacher" ? "none" : "approved",
+        // Student grade + exam board captured at signup (editable later in the
+        // student profile). Only meaningful for students.
+        ...(role === "student" && typeof body.grade === "number"
+          ? { grade: body.grade }
+          : {}),
+        ...(role === "student" && body.syllabus
+          ? { syllabus: body.syllabus }
+          : {}),
         blocked: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

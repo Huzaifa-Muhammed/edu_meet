@@ -4,7 +4,41 @@
 
 ---
 
-## Last Updated: 2026-06-13 (session 13 — fixed Drive→slides presentation end-to-end: PDF content-type sniffing, slide-presenter overflow UI, and the real blocker — slides now stored on Cloudinary (Firebase Storage was never provisioned) with auto-purge on class end)
+## Last Updated: 2026-06-30 (session 14 — threaded grade + exam board ("syllabus") through teacher application, student signup/profile, class creation, AI scheduling, and the live-class import-content filter)
+
+---
+
+## Session 14 (2026-06-30) — Grade + exam board ("syllabus") across applications, signup, profiles, class creation, AI scheduling & content import
+
+Course content (session 12) was uploaded per-subject with **Topic · Grade · Syllabus · Link**, where **"syllabus" = exam board** (Edexcel, AQA, Cambridge/CIE, OCR…) — confirmed by the user (their files are e.g. "AQA Chemistry Grade 9", "Edexcel Grade 10"). But the app never captured grade/board from teachers or students, classrooms had a `grade` but no board, and the live-class **Import content** panel showed **every** doc for the subject. This session captures grade + board at the points the user named and makes the import list actually filter to the class. Three product decisions (confirmed): **board = canonical dropdown + allow custom**; **grade stays numeric 1–12** (matcher normalizes free-text Excel grades); **import filters to the class's grade+board by default with a "Show all" toggle**.
+
+### Foundation (2 new files)
+- **`src/shared/constants/curriculum.ts`** — `SYLLABI` (Edexcel/AQA/Cambridge/OCR/WJEC/IB), `GRADES` (1–12), `normSyllabus`, **`syllabusMatches(classBoard, itemBoard)`** + **`gradeMatches(classGrade, itemGradeStr)`** (parse first int out of "Grade 9"/"9"/"Year 10"; blank item metadata = wildcard, blank class value = wildcard).
+- **`src/components/shared/syllabus-select.tsx`** — controlled `SyllabusSelect` (dropdown + "Other…" free-text), `SyllabusMultiSelect` (chip toggles + add-custom), `GradeMultiSelect` (1–12 chips). Semantic tokens so they flip per portal scope.
+
+### Teacher application — grades taught + boards taught
+- `TeacherApplicationCreateSchema` (+`grades: number[]`, `syllabi: string[]`, both optional). Apply form (`teacher/apply/page.tsx`) adds `GradeMultiSelect` + `SyllabusMultiSelect` (via `useWatch`/`setValue`) and read-only summary rows. Service `submit()` patch writes `applicationGrades`/`applicationSyllabi`; `UserDoc` + `userDocToApplication` mapper surface `grades`/`syllabi`. Domain `User` + `TeacherApplication` view extended. Admin applications card shows new Field cards. (Informational; used as the class-creation board default — no approval-time promotion.)
+
+### Student signup + profile — capture grade + board, editable later
+- Domain `User` (+`grade?: number`, `syllabus?: string`). `SignupSchema` adds grade/syllabus with `.refine` **requiring them only when role==="student"**; fields render **student-only**. Threaded through `signUp(email,…,extra)` → `SessionRequestSchema` → session route writes them into `newUser` (student only). `UserUpdateSchema` (+grade/syllabus) → student profile "Personal info" now has a Grade `<select>` + `SyllabusSelect` (replacing the "type your grade into bio" workaround). *(Student grade/board are captured + editable + shown; using them to filter student class recommendations is a deliberate follow-up — matching stays subject-only.)*
+
+### Class creation — classroom gets a board (grade already existed)
+- Domain `Classroom` (+`syllabus?`, also formalized the already-written `subjectName?`). `ClassroomCreateSchema` (+`syllabus`); flows to Firestore via `...data` in `classroomsService.create` (`ClassroomUpdateSchema` inherits via `.partial()`). `CreateClassForm` adds a `SyllabusSelect` **defaulting to the teacher's first `applicationSyllabi` board** (useEffect on open) + sends `syllabus` in the POST body.
+
+### AI scheduling — board into the prompt
+- `schedule.service.ts`: `ClassroomLite` (+`syllabus?`), `loadClassrooms` reads it, and the `classList` prompt line now appends `| board: <syllabus|General>` (grade was already in the prompt). AI still only returns timing; board/grade are scheduling inputs.
+
+### Import content — filter to the class's grade + board (the payoff)
+- `GET /api/classrooms/[id]/course-content` now also returns `classroomGrade` + `classroomSyllabus` (keeps returning **all** items). `CourseContentList` (shared by the Resources **Import content** modal **and** the two slide-presenter import zones — both inherit it) computes the matched subset via `gradeMatches`+`syllabusMatches`, **defaults to matched**, adds a **"Show all (N)" ⇄ "Show match only (N)"** toggle, and when nothing matches falls back to all with a hint. Per-row grade/board badges unchanged.
+
+### Build status
+- `npx tsc --noEmit` → **0 errors** (excluding stale `.next/dev/types/*` from a running dev server — a known session-9.3 artifact). New/changed files **ESLint-clean** after switching new `watch()` calls to `useWatch` (codebase convention). **No new dep, no new collection, no composite index, no migration** — all fields additive/optional (undefined board = wildcard match, so existing classrooms/users/content keep working).
+
+### Heads-up
+1. **Existing data has no board.** Old classrooms/users/content with no board are treated as wildcards (they match everything), so nothing breaks; teachers/students should set their board to get filtered results. Re-upload an Excel or edit profiles to populate.
+2. **Grade is numeric 1–12; item grade is free text.** The matcher pulls the first integer from the Excel grade string. A board/grade label the matcher can't parse (e.g. "AS"/"A2") is treated as wildcard → shows under "match", erring toward visibility. Tighten `gradeMatches` if AS/A2-style labels need exact handling.
+3. **2 pre-existing apostrophe lint errors** in `student/(portal)/profile/page.tsx` (lines ~247/285, "We'll"/"You haven't") were already there — left untouched per repo precedent.
+4. **Not runtime-tested here** (static tsc/lint only): warrants a manual pass — apply as a teacher with grades/boards → admin sees them; sign up a student (grade/board required) → edit in profile; create a class with a board (defaults from teacher) → Import content / slide presenter shows only matching docs with a working "Show all".
 
 ---
 

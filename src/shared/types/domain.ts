@@ -68,8 +68,16 @@ export interface User {
   status?: "none" | "pending" | "approved" | "rejected";
   applicationStatus?: "none" | "pending" | "approved" | "rejected";
   applicationSubject?: string;
+  /** Grade levels (1–12) the teacher can teach. */
+  applicationGrades?: number[];
+  /** Exam boards / syllabi the teacher can teach (e.g. Edexcel, AQA). */
+  applicationSyllabi?: string[];
   applicationYearsExperience?: number;
   applicationHighestDegree?: string;
+  /** Student-only: grade level (1–12) + exam board, captured at signup,
+   * editable in the student profile. */
+  grade?: number;
+  syllabus?: string;
   applicationSubmittedAt?: string;
   applicationReviewedAt?: string;
   applicationReviewedBy?: string;
@@ -91,6 +99,8 @@ export interface TeacherApplication {
   email: string;
   displayName: string;
   subject: string;
+  grades?: number[];
+  syllabi?: string[];
   yearsExperience: number;
   highestDegree: string;
   bio?: string;
@@ -116,7 +126,10 @@ export interface Classroom {
   id: string;
   teacherId: string;
   subjectId: string;
+  subjectName?: string;
   grade: number;
+  /** Exam board / syllabus this class follows (e.g. Edexcel, AQA). */
+  syllabus?: string;
   name: string;
   description?: string;
   code: string;
