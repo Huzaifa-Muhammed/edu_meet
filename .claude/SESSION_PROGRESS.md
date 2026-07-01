@@ -4,7 +4,38 @@
 
 ---
 
-## Last Updated: 2026-06-30 (session 14 — threaded grade + exam board ("syllabus") through teacher application, student signup/profile, class creation, AI scheduling, and the live-class import-content filter)
+## Last Updated: 2026-07-01 (session 15 — fixed the AI schedule dropping the exam board ("syllabus"); made boards editable post-signup for existing teachers + students via profile pages and a dismissible nudge popup)
+
+---
+
+## Session 15 (2026-07-01) — AI schedule now carries the syllabus (exam board) · existing users can set/edit their board via profile + a nudge popup
+
+Two testing-reported problems: (1) the **AI-generated teacher schedule wasn't showing or matching the exam board** — classes came out with no board at all; (2) **users who joined before the session-14 syllabus feature have no board on file**, and there was no way for them to add one (students could edit theirs, but **teachers had no post-application UI to edit boards taught**). Both fixed.
+
+### Root cause of #1 — board dropped at the meeting-write step
+Session 14 threaded `syllabus` from Firestore → `ClassroomLite` → the AI prompt (the `classList` line even prints `| board: <syllabus>`), but `scheduleService.generate()` **never copied `syllabus`/`grade` onto the meeting docs it wrote** — only `subjectName`/`title`. So every AI class lost the board, and no schedule view displayed it. (Syllabus is intentionally *not* round-tripped through the AI response — `classroomId` links back to the classroom meta — so the fix is purely on the write/hydrate/display side.)
+
+### Fix — thread `syllabus` + `grade` through meeting docs + display
+- **`domain.ts`** — `Meeting` gains `syllabus?: string` + `grade?: number` (optional/additive).
+- **`schedule.service.ts`** — `MeetingDoc` type + `generate()` write now include `syllabus: meta.syllabus ?? null` / `grade: meta.grade ?? null`. `listMonth`'s `classroomById` map now reads `syllabus`/`grade`; **`hydrateMeeting` surfaces them, falling back to the classroom's *current* board/grade** (`m.syllabus ?? cls?.syllabus`) so meetings scheduled **before** this change — and classrooms that only set a board later — still display correctly without a migration.
+- **`month-calendar.tsx`** — `ScheduleMeeting` type gains `syllabus?`/`grade?`. **Schedule-page `ClassDetailModal`** shows a new **"Curriculum: Grade N · Board"** row (only when present). The `/api/teacher/schedule` route already returns `listMonth` output verbatim, so no route change.
+
+### Fix — existing users can set/edit their board
+- **`UserUpdateSchema`** (+`applicationGrades: number[]`, `applicationSyllabi: string[]`, both optional/capped) so teachers can self-edit boards taught (previously only captured at application time, never editable).
+- **`src/components/teacher/teaching-prefs-form.tsx`** (new) — "Grades & exam boards you teach" card on the **teacher profile** using `GradeMultiSelect` + `SyllabusMultiSelect` (react-hook-form `values`/`useWatch`/`setValue` — **no `setState`-in-effect**, per the repo lint rule). PATCHes `/users/me`. (Students already had grade+board editing in their profile from session 14 — unchanged.)
+- **`src/components/shared/syllabus-nudge-popup.tsx`** (new) — dismissible bottom-left popup, **self-gates by role**: shows to students missing `syllabus`/`grade` and to **approved** teachers missing `applicationSyllabi`, linking to their profile. Follows the `cover-request-popup` pattern (localStorage dismissal, `--acc`/`--surf` tokens so it themes per portal scope). Mounted in **both** `(portal)/layout.tsx` files; auto-hides once the field is filled.
+
+### Auth-context gotcha (important)
+`useCurrentUser` reads the user from the **auth-provider `useState`** (fed by `POST /auth/session` in `refreshUser`), **not** from a react-query cache — so the existing profile forms' `invalidateQueries(["user","me"])` is a **no-op for the displayed user**. Added `refreshUser()` to both the teacher-prefs and student-profile save paths (exposed `refreshUser` from `useCurrentUser`) so the context updates and the nudge popup clears immediately after saving.
+
+### Build status
+- `npx tsc --noEmit` → **0 errors**. New files **ESLint-clean** (had to switch the teacher-prefs form from a seeding `useEffect` to react-hook-form `values` to satisfy `react-hooks/set-state-in-effect`). The **2 apostrophe lint errors** in `student/(portal)/profile/page.tsx` (~248/286) are **pre-existing** (noted in session 14). **No new dep, no new collection, no composite index, no migration** — all fields additive/optional. Committed **`188920f`**, pushed to `origin/main`.
+
+### Heads-up
+1. **Existing classrooms created before session 14 have no board**, and there is **no edit-classroom UI** to set one — a classroom's board is only captured in `CreateClassForm` at creation (defaulting from the teacher's first `applicationSyllabi`). So the AI schedule will keep showing **no board for old classrooms** even after the teacher sets their profile boards; only **newly created** classes pick up the default. **Open follow-up (offered, not built): add a board+grade editor to existing classrooms** to back-fill old test data. `ClassroomUpdateSchema` already accepts `syllabus` (via `.partial()`) — only UI + a PATCH wire-up are missing.
+2. **Nudge dismissal is a single localStorage flag** (`edumeet:syllabus-nudge-dismissed`), not per-portal — dismissing in one portal dismisses everywhere for that browser. It reappears only if the flag is cleared; setting the board is the intended way to make it go away.
+3. **Teacher nudge gates on `approved`** (`status`/`applicationStatus === "approved"`) — pending/rejected teachers aren't nagged.
+4. **Not runtime-tested here** (static tsc/lint only): warrants a manual pass — as an existing teacher, set boards in profile → create a class → generate AI schedule → open a class in the calendar and confirm the "Curriculum" row shows; as an existing student with no board, confirm the nudge appears and clears after saving grade+board.
 
 ---
 
