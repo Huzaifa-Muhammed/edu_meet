@@ -218,6 +218,11 @@ export interface Meeting {
   scheduledTime?: string; // "HH:MM" 24h (local wall time)
   durationMin?: number;
   subjectName?: string;
+  /** Exam board / syllabus + grade this class follows — copied from the
+   * classroom when the meeting is (AI-)scheduled so the schedule can display
+   * and match on them without a second classroom read. */
+  syllabus?: string;
+  grade?: number;
   title?: string;
   source?: "manual" | "ai";
   /** AI proposals start as "proposed" (teacher-only); approval flips to

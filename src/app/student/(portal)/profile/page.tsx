@@ -39,7 +39,7 @@ type StudentAssessment = {
 };
 
 export default function StudentProfilePage() {
-  const { user } = useCurrentUser();
+  const { user, refreshUser } = useCurrentUser();
   const router = useRouter();
   const qc = useQueryClient();
 
@@ -80,9 +80,10 @@ export default function StudentProfilePage() {
   const mutation = useMutation({
     mutationFn: (data: UserUpdateInput) =>
       api.patch("/users/me", data) as Promise<unknown>,
-    onSuccess: (_, variables) => {
+    onSuccess: async (_, variables) => {
       toast.success("Profile updated");
       qc.invalidateQueries({ queryKey: ["user", "me"] });
+      await refreshUser();
       reset(variables);
     },
     onError: (err: Error) => toast.error(err.message),

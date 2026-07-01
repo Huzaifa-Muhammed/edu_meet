@@ -464,6 +464,16 @@ function ClassDetailModal({
         <div className="space-y-2 rounded-xl border border-bd bg-panel p-3 text-xs">
           <Row label="When" value={dateLabel} />
           <Row label="Time" value={`${m.scheduledTime ?? "—"} · ${m.durationMin} min`} />
+          {(m.grade != null || m.syllabus) && (
+            <Row
+              label="Curriculum"
+              value={
+                [m.grade != null ? `Grade ${m.grade}` : null, m.syllabus || null]
+                  .filter(Boolean)
+                  .join(" · ") || "—"
+              }
+            />
+          )}
           <Row
             label="Status"
             value={

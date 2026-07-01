@@ -6,6 +6,7 @@ import { StudentTopbar } from "@/components/student/student-topbar";
 import { StudentSidenav } from "@/components/student/student-sidenav";
 import { StudentRightSidebar } from "@/components/student/student-right-sidebar";
 import { ClassReminderPopup } from "@/components/student/class-reminder-popup";
+import { SyllabusNudgePopup } from "@/components/shared/syllabus-nudge-popup";
 
 export default function StudentPortalLayout({
   children,
@@ -32,6 +33,7 @@ export default function StudentPortalLayout({
         </div>
       </div>
       <ClassReminderPopup />
+      <SyllabusNudgePopup />
     </div>
   );
 }

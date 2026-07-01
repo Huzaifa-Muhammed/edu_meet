@@ -12,6 +12,8 @@ export type ScheduleMeeting = {
   scheduledDate?: string; // YYYY-MM-DD
   scheduledTime?: string; // HH:MM
   durationMin: number;
+  syllabus?: string; // exam board
+  grade?: number;
   source?: string;
 };
 

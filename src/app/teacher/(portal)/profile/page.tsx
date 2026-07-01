@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api/client";
 import { ProfileForm } from "@/components/teacher/profile-form";
+import { TeachingPrefsForm } from "@/components/teacher/teaching-prefs-form";
 import { SubjectPicker } from "@/components/shared/subject-picker";
 import { TeacherCredentials } from "@/components/shared/teacher-credentials";
 import { ChangePasswordForm } from "@/components/shared/change-password-form";
@@ -86,6 +87,17 @@ export default function TeacherProfilePage() {
             }}
             invalidateUserQuery
           />
+        </div>
+
+        <div className="rounded-xl border border-bd bg-surf p-6">
+          <h2 className="mb-1 text-sm font-semibold text-t">
+            Grades & exam boards you teach
+          </h2>
+          <p className="mb-4 text-xs text-t3">
+            These set the default board for new classes and help the AI scheduler
+            match your classes to the right curriculum.
+          </p>
+          <TeachingPrefsForm />
         </div>
 
         <div className="rounded-xl border border-bd bg-surf p-6">

@@ -76,6 +76,8 @@ type MeetingDoc = {
   scheduledTime?: string;
   durationMin?: number;
   subjectName?: string;
+  syllabus?: string;
+  grade?: number;
   title?: string;
   source?: string;
 };
@@ -135,12 +137,20 @@ export const scheduleService = {
 
     const classroomById = new Map(
       classroomsSnap.docs.map((d) => {
-        const c = d.data() as { name?: string; subjectId?: string; subjectName?: string };
+        const c = d.data() as {
+          name?: string;
+          subjectId?: string;
+          subjectName?: string;
+          syllabus?: string;
+          grade?: number;
+        };
         return [
           d.id,
           {
             name: c.name ?? "Class",
             subjectName: c.subjectName ?? resolveSubjectName(c.subjectId ?? "", c.subjectName),
+            syllabus: c.syllabus,
+            grade: c.grade,
           },
         ];
       }),
@@ -293,6 +303,8 @@ export const scheduleService = {
             scheduledTime: time,
             durationMin: entry.durationMin,
             subjectName: meta.subjectName,
+            syllabus: meta.syllabus ?? null,
+            grade: meta.grade ?? null,
             title: meta.name,
             source: "ai",
           },
@@ -410,7 +422,10 @@ export const scheduleService = {
 function hydrateMeeting(
   id: string,
   m: MeetingDoc,
-  classroomById: Map<string, { name: string; subjectName: string }>,
+  classroomById: Map<
+    string,
+    { name: string; subjectName: string; syllabus?: string; grade?: number }
+  >,
 ) {
   const cls = classroomById.get(m.classroomId ?? "");
   return {
@@ -418,6 +433,11 @@ function hydrateMeeting(
     classroomId: m.classroomId ?? "",
     classroomName: cls?.name ?? m.title ?? "Class",
     subjectName: m.subjectName ?? cls?.subjectName ?? "",
+    // Prefer the value stamped on the meeting; fall back to the classroom's
+    // current board/grade so meetings scheduled before this was stored (or
+    // classrooms that only set a board later) still display correctly.
+    syllabus: m.syllabus ?? cls?.syllabus ?? "",
+    grade: m.grade ?? cls?.grade,
     status: m.status ?? "scheduled",
     scheduleStatus: (m.scheduleStatus as string | undefined) ?? "approved",
     scheduledDate: m.scheduledDate ?? m.startedAt?.slice(0, 10),
